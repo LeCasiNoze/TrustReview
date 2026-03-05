@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { loadStripe } from "@stripe/stripe-js";
+import type { Stripe } from "@stripe/stripe-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -54,11 +55,15 @@ export default function BillingPage() {
         
         // Rediriger vers Stripe Checkout
         const stripe = await loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
-        const { error } = await stripe!.redirectToCheckout({ sessionId });
-
-        if (error) {
-          console.error('Stripe checkout error:', error);
-          alert('Erreur lors du paiement. Veuillez réessayer.');
+        if (stripe) {
+          const { error } = await (stripe as any).redirectToCheckout({
+            sessionId: sessionId
+          });
+          
+          if (error) {
+            console.error('Stripe checkout error:', error);
+            alert('Erreur lors du paiement. Veuillez réessayer.');
+          }
         }
       } else {
         console.error('Failed to create checkout session');

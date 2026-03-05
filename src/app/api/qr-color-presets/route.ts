@@ -12,12 +12,12 @@ export async function GET() {
     // Filtrer les presets selon le plan
     const availablePresets = presets.filter(preset => {
       if (!preset.is_premium) return true;
-      return subscriptionInfo.hasFeature('qr_customization');
+      return subscriptionInfo?.hasFeature?.('qr_customization') ?? false;
     });
 
     return NextResponse.json({ 
       presets: availablePresets,
-      canUsePremium: subscriptionInfo.hasFeature('qr_customization')
+      canUsePremium: subscriptionInfo?.hasFeature?.('qr_customization') ?? false
     });
   } catch (error) {
     console.error('Error fetching color presets:', error);

@@ -36,9 +36,9 @@ export async function POST(req: Request) {
     }
 
     // Créer ou récupérer le client Stripe
-    let customerId = subscriptionInfo.subscription?.stripe_customer_id;
-    
-    if (!customerId) {
+    let customerId = subscriptionInfo?.subscription?.stripe_customer_id;
+        if (!customerId) {
+          
       const customer = await stripe.customers.create({
         email: user.email!,
         name: user.user_metadata?.name || user.email!,

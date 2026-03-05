@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createStripeSubscription, STRIPE_PLANS } from "@/lib/stripe";
 import { createSupabaseServer } from "@/lib/supabase-server";
-import { getUserSubscriptionInfo } from "@/lib/subscription";
+import { getUserSubscriptionInfoServer } from "@/lib/subscription.server";
+import Stripe from 'stripe';
 
 export async function POST(req: Request) {
   try {
@@ -19,9 +20,9 @@ export async function POST(req: Request) {
     }
 
     // Récupérer les infos d'abonnement actuel
-    const subscriptionInfo = await getUserSubscriptionInfo();
+    const subscriptionInfo = await getUserSubscriptionInfoServer();
     
-    if (!subscriptionInfo.subscription?.stripe_customer_id) {
+    if (!subscriptionInfo || !subscriptionInfo.subscription?.stripe_customer_id) {
       return NextResponse.json({ error: "No Stripe customer found" }, { status: 400 });
     }
 
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
     }
 
     // Créer l'abonnement Stripe
-    const stripeSubscription = await createStripeSubscription(
+    const stripeSubscriptionResponse = await createStripeSubscription(
       subscriptionInfo.subscription.stripe_customer_id,
       priceId
     );
@@ -59,17 +60,22 @@ export async function POST(req: Request) {
       .from('subscriptions')
       .update({
         plan_id: plan.id,
-        stripe_subscription_id: stripeSubscription.id,
+        stripe_subscription_id: stripeSubscriptionResponse.id,
         status: 'active',
-        current_period_end: new Date(stripeSubscription.current_period_end * 1000).toISOString(),
+        current_period_end: new Date((stripeSubscriptionResponse as any).current_period_end * 1000).toISOString(),
         cancel_at_period_end: false,
         updated_at: new Date().toISOString()
       })
       .eq('user_id', user.id);
 
     return NextResponse.json({
-      subscription: stripeSubscription,
-      clientSecret: stripeSubscription.latest_invoice?.payment_intent?.client_secret
+      subscription: stripeSubscriptionResponse,
+      clientSecret: stripeSubscriptionResponse.latest_invoice && 
+        typeof stripeSubscriptionResponse.latest_invoice === 'object' && 
+        'payment_intent' in stripeSubscriptionResponse.latest_invoice && 
+        stripeSubscriptionResponse.latest_invoice.payment_intent
+        ? (stripeSubscriptionResponse.latest_invoice.payment_intent as Stripe.PaymentIntent).client_secret
+        : undefined
     });
 
   } catch (error) {

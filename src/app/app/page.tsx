@@ -3,20 +3,13 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { Business } from "@/lib/business-manager";
 
 interface Stats {
   totalRatings: number;
   totalFeedbacks: number;
   averageRating: number;
   positiveRate: number;
-}
-
-interface Business {
-  id: string;
-  name: string;
-  slug: string;
-  google_review_url: string;
-  is_active: boolean;
 }
 
 interface RecentFeedback {

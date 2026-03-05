@@ -29,7 +29,7 @@ export async function createStripeCustomer(email: string, name?: string) {
   }
 }
 
-export async function createStripeSubscription(customerId: string, priceId: string) {
+export async function createStripeSubscription(customerId: string, priceId: string): Promise<Stripe.Subscription> {
   try {
     const subscription = await stripe.subscriptions.create({
       customer: customerId,

@@ -4,9 +4,10 @@ export interface Business {
   id: string;
   name: string;
   slug: string;
-  logo_url?: string;
+  logo_url?: string | null;
   google_review_url?: string;
   threshold_positive?: number;
+  notification_email?: string | null;
   is_active: boolean;
   owner_user_id: string;
   created_at: string;

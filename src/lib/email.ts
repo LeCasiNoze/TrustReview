@@ -9,7 +9,7 @@ interface EmailData {
 
 // Configuration du transporteur Nodemailer avec Outlook SMTP
 const createTransporter = () => {
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     host: process.env.EMAIL_HOST || 'smtp.office365.com',
     port: parseInt(process.env.EMAIL_PORT || '587'),
     secure: false, // true for 465, false for other ports
