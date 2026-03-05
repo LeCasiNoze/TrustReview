@@ -1,20 +1,33 @@
-﻿{
+{
+  "functions": {
+    "src/app/api/stripe/webhook/route.ts": {
+      "maxDuration": 30
+    }
+  },
   "headers": [
     {
       "source": "/api/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "no-store, must-revalidate" }
+        {
+          "key": "Cache-Control",
+          "value": "no-store, must-revalidate"
+        }
       ]
     },
     {
       "source": "/r/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=3600, s-maxage=3600" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, s-maxage=3600"
+        }
       ]
     }
   ],
-  "rewrites": [{ "source": "/", "destination": "/app" }],
-  "functions": {
-    "src/app/api/stripe/webhook/route.ts": { "maxDuration": 30 }
-  }
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/app"
+    }
+  ]
 }
