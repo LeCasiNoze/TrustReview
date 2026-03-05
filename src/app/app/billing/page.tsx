@@ -27,8 +27,9 @@ export default function BillingPage() {
         throw new Error(json.error || "Failed to load billing data");
       }
       
-      setSubscriptionInfo(json.info);
-      setPlans(json.plans);
+      // Utiliser le nouvel objet de l'API
+      setSubscriptionInfo(json.subscription);
+      setPlans(json.plan ? [json.plan] : []);
     } catch (error) {
       console.error('Error loading billing data:', error);
     } finally {
@@ -40,6 +41,30 @@ export default function BillingPage() {
     return subscriptionInfo?.features?.[feature] || false;
   };
 
+  const handleStartTrial = async () => {
+    setUpdating(true);
+    try {
+      const response = await fetch("/api/billing/start-trial", {
+        method: "POST",
+        headers: { "content-type": "application/json" }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to start trial");
+      }
+
+      // Rediriger vers Stripe Checkout
+      window.location.href = data.checkoutUrl;
+    } catch (error) {
+      console.error('Error starting trial:', error);
+      alert('Erreur lors du démarrage de l\'essai. Veuillez réessayer.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   const handlePlanChange = async (planId: string, billingCycle: 'monthly' | 'yearly' = 'monthly') => {
     setUpdating(true);
     try {
@@ -49,29 +74,31 @@ export default function BillingPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ planId, billingCycle })
       });
-
-      if (response.ok) {
-        const { sessionId } = await response.json();
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create checkout session");
+      }
+      
+      // Rediriger vers Stripe Checkout
+      const stripe = await loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+      if (stripe) {
+        const { error } = await (stripe as any).redirectToCheckout({
+          sessionId: data.sessionId
+        });
         
-        // Rediriger vers Stripe Checkout
-        const stripe = await loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
-        if (stripe) {
-          const { error } = await (stripe as any).redirectToCheckout({
-            sessionId: sessionId
-          });
-          
-          if (error) {
-            console.error('Stripe checkout error:', error);
-            alert('Erreur lors du paiement. Veuillez réessayer.');
-          }
+        if (error) {
+          console.error('Stripe checkout error:', error);
+          alert('Erreur lors du paiement. Veuillez réessayer.');
         }
       } else {
-        console.error('Failed to create checkout session');
-        alert('Erreur lors de la création de la session de paiement.');
+        console.error('Failed to load Stripe');
+        alert('Erreur lors du chargement du système de paiement.');
       }
     } catch (error) {
-      console.error('Error updating plan:', error);
-      alert('Erreur lors du paiement. Veuillez réessayer.');
+      console.error('Error changing plan:', error);
+      alert('Erreur lors du changement d\'abonnement. Veuillez réessayer.');
     } finally {
       setUpdating(false);
     }
@@ -88,52 +115,99 @@ export default function BillingPage() {
   const currentPlan = subscriptionInfo.plan;
 
   return (
-    <div className="space-y-6 max-w-6xl">
-      {/* Header */}
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1 className="page-title">Facturation & Abonnement</h1>
-          <p className="page-desc">Gérez votre plan et vos fonctionnalités</p>
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Facturation</h1>
+          <p className="text-muted-foreground">Gérez votre abonnement et vos factures</p>
         </div>
       </div>
 
-      {/* Current Plan Status */}
+      {/* Onboarding Section for New Users */}
+      {!subscriptionInfo || (!subscriptionInfo.plan || subscriptionInfo.plan.slug === 'starter') && (
+        <Card className="card-enhanced border-green-200 bg-green-50">
+          <CardHeader>
+            <CardTitle>
+              <h2 className="text-xl font-semibold text-green-800">🎉 Bienvenue sur TrustReview !</h2>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-green-700">
+              Commencez votre essai gratuit de 7 jours pour découvrir toutes les fonctionnalités de TrustReview.
+            </p>
+            <div className="bg-white p-4 rounded-lg border border-green-200">
+              <h3 className="font-semibold text-green-800 mb-2">✨ Votre essai 7 jours inclut :</h3>
+              <ul className="space-y-1 text-sm text-green-700">
+                <li>• QR codes illimités</li>
+                <li>• Entreprises illimitées</li>
+                <li>• Analytics avancées</li>
+                <li>• Support prioritaire</li>
+              </ul>
+            </div>
+            <Button 
+              onClick={handleStartTrial}
+              disabled={updating}
+              className="w-full bg-green-600 hover:bg-green-700"
+              size="lg"
+            >
+              {updating ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Configuration en cours...
+                </>
+              ) : (
+                <>
+                  🚀 Démarrer mon essai gratuit
+                </>
+              )}
+            </Button>
+            <p className="text-xs text-green-600 text-center">
+              Aucune carte requise • Annulez à tout moment
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Current Subscription */}
       <Card className="card-enhanced">
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Abonnement actuel</span>
-            <Badge className={
-              subscriptionInfo.isTrialActive ? "bg-amber-100 text-amber-800" :
-              subscriptionInfo.subscription?.status === 'active' ? "bg-green-100 text-green-800" :
-              "bg-slate-100 text-slate-800"
-            }>
-              {subscriptionInfo.isTrialActive ? `Essai - ${subscriptionInfo.trialDaysLeft}j restants` :
-               subscriptionInfo.subscription?.status === 'active' ? 'Actif' : 'Inactif'}
-            </Badge>
+          <CardTitle>
+            <h2 className="text-xl font-semibold">Abonnement actuel</h2>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-lg font-semibold">{currentPlan?.name}</h3>
-              <p className="text-sm text-muted-foreground">{currentPlan?.description}</p>
+          {!subscriptionInfo ? (
+            <div className="text-center py-4">
+              <p className="text-muted-foreground">Aucun abonnement actif</p>
             </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-3 rounded-lg bg-slate-50">
-                <div className="text-2xl font-bold text-blue-600">
-                  {subscriptionInfo.remainingQRCodes === null ? '∞' : subscriptionInfo.remainingQRCodes}
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold">{subscriptionInfo.plan?.name || 'Aucun plan'}</h3>
+                  <p className="text-sm text-muted-foreground">{subscriptionInfo.plan?.description}</p>
                 </div>
-                <div className="text-xs text-muted-foreground">QR codes restants</div>
+                <Badge variant={subscriptionInfo.isTrialActive ? "secondary" : "default"}>
+                  {subscriptionInfo.isTrialActive ? `Essai (${subscriptionInfo.trialDaysLeft}j restants)` : 'Actif'}
+                </Badge>
               </div>
-              <div className="text-center p-3 rounded-lg bg-slate-50">
-                <div className="text-2xl font-bold text-blue-600">
-                  {subscriptionInfo.remainingBusinesses === null ? '∞' : subscriptionInfo.remainingBusinesses}
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="text-center p-3 rounded-lg bg-slate-50">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {subscriptionInfo.remainingQRCodes === null ? '∞' : subscriptionInfo.remainingQRCodes}
+                  </div>
+                  <div className="text-xs text-muted-foreground">QR codes restants</div>
                 </div>
-                <div className="text-xs text-muted-foreground">Entreprises restantes</div>
+                <div className="text-center p-3 rounded-lg bg-slate-50">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {subscriptionInfo.remainingBusinesses === null ? '∞' : subscriptionInfo.remainingBusinesses}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Entreprises restantes</div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
@@ -224,40 +298,6 @@ export default function BillingPage() {
           })}
         </div>
       </div>
-
-      {/* Features List */}
-      <Card className="card-enhanced">
-        <CardHeader>
-          <CardTitle>Fonctionnalités disponibles</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-2 gap-4">
-            {[
-              { key: 'basic_stats', name: 'Statistiques de base' },
-              { key: 'advanced_stats', name: 'Statistiques avancées' },
-              { key: 'email_notifications', name: 'Notifications email' },
-              { key: 'qr_customization', name: 'Personnalisation QR codes' },
-              { key: 'multiple_businesses', name: 'Plusieurs entreprises' },
-              { key: 'api_access', name: 'API d intégration' },
-              { key: 'priority_support', name: 'Support prioritaire' },
-              { key: 'exports', name: 'Exports de données' },
-              { key: 'white_label', name: 'Branding blanc' },
-              { key: 'multi_users', name: 'Multi-utilisateurs' }
-            ].map(({ key, name }) => (
-              <div key={key} className="flex items-center gap-2">
-                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${
-                  subscriptionInfo.hasFeature(key) 
-                    ? 'bg-green-100 text-green-600' 
-                    : 'bg-slate-100 text-slate-400'
-                }`}>
-                  {subscriptionInfo.hasFeature(key) ? '✓' : '✗'}
-                </span>
-                <span className="text-sm">{name}</span>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
