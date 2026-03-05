@@ -43,7 +43,7 @@ export async function getUserSubscriptionInfoServer(): Promise<UserSubscriptionI
         .insert({
           user_id: user.id,
           plan_id: starterPlan.id,
-          status: 'trial',
+          status: 'trialing',
           trial_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 jours
           stripe_subscription_id: null,
           created_at: new Date().toISOString(),

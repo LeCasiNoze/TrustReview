@@ -27,11 +27,33 @@ export default function BillingPage() {
         throw new Error(json.error || "Failed to load billing data");
       }
       
-      // Utiliser le nouvel objet de l'API
+      // Utiliser les données de l'API
       setSubscriptionInfo(json.subscription);
       setPlans(json.plan ? [json.plan] : []);
+      
+      console.log("📊 Billing data loaded:", {
+        subscription: json.subscription,
+        plan: json.plan,
+        isAuthenticated: json.isAuthenticated,
+        hasSubscriptionActive: json.hasSubscriptionActive,
+        isTrialActive: json.isTrialActive
+      });
     } catch (error) {
       console.error('Error loading billing data:', error);
+      // Créer un objet par défaut pour éviter les erreurs d'affichage
+      setSubscriptionInfo({
+        plan: null,
+        subscription: null,
+        features: {},
+        canCreateQR: false,
+        canCreateBusiness: false,
+        remainingQRCodes: 0,
+        remainingBusinesses: 0,
+        isTrialActive: false,
+        trialDaysLeft: 0,
+        hasFeature: () => false
+      });
+      setPlans([]);
     } finally {
       setLoading(false);
     }
@@ -123,8 +145,54 @@ export default function BillingPage() {
         </div>
       </div>
 
+      {/* Trial Active Section */}
+      {subscriptionInfo.isTrialActive && subscriptionInfo.plan && (
+        <Card className="card-enhanced border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle>
+              <h2 className="text-xl font-semibold text-blue-800">🎯 Essai Gratuit Actif</h2>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-blue-700">
+              Votre essai gratuit de 7 jours est actif ! Profitez de toutes les fonctionnalités premium.
+            </p>
+            <div className="bg-white p-4 rounded-lg border border-blue-200">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold text-blue-800">⏰ Temps restant :</h3>
+                <span className="text-lg font-bold text-blue-600">
+                  {subscriptionInfo.trialDaysLeft || 0} jours
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full" 
+                  style={{ width: `${Math.max(0, (subscriptionInfo.trialDaysLeft || 0) / 7 * 100)}%` }}
+                ></div>
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded-lg border border-blue-200">
+              <h3 className="font-semibold text-blue-800 mb-2">✨ Fonctionnalités incluses :</h3>
+              <ul className="space-y-1 text-sm text-blue-700">
+                <li>• QR codes illimités</li>
+                <li>• Entreprises illimitées</li>
+                <li>• Analytics avancées</li>
+                <li>• Support prioritaire</li>
+              </ul>
+            </div>
+            <Button 
+              onClick={() => window.location.href = '/app'}
+              className="w-full bg-blue-600 hover:bg-blue-700"
+              size="lg"
+            >
+              🚀 Accéder au dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Onboarding Section for New Users */}
-      {!subscriptionInfo || (!subscriptionInfo.plan || subscriptionInfo.plan.slug === 'starter') && (
+      {(!subscriptionInfo.plan || subscriptionInfo.plan.slug === 'starter') && (
         <Card className="card-enhanced border-green-200 bg-green-50">
           <CardHeader>
             <CardTitle>

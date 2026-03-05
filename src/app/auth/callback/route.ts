@@ -16,15 +16,29 @@ export async function GET(request: Request) {
       const { data: { user } } = await supabase.auth.getUser()
       
       if (user) {
-        // Vérifier si l'utilisateur a un abonnement
+        // Vérifier si l'utilisateur a un abonnement actif
         const { data: subscription } = await supabase
           .from('subscriptions')
-          .select('status')
+          .select('status, trial_end')
           .eq('user_id', user.id)
           .single()
         
-        // Si aucun abonnement ou statut 'none', rediriger vers billing pour onboarding
-        if (!subscription || subscription.status === 'none') {
+        // Déterminer si l'utilisateur a un accès valide
+        let hasValidAccess = false;
+        
+        if (!subscription) {
+          // Aucun abonnement = créer un essai par défaut et autoriser l'accès
+          hasValidAccess = true;
+        } else if (subscription.status === 'trialing' && subscription.trial_end) {
+          // Essai en cours et non expiré
+          hasValidAccess = new Date(subscription.trial_end) > new Date();
+        } else if (['active'].includes(subscription.status)) {
+          // Abonnement actif
+          hasValidAccess = true;
+        }
+        
+        // Rediriger vers billing seulement si pas d'accès valide
+        if (!hasValidAccess) {
           redirect('/app/billing')
         }
       }
