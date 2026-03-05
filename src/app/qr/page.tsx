@@ -23,7 +23,12 @@ export default function QRPage() {
       setBusiness(data);
       
       // Generate QR code with dynamic slug from Supabase
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      let baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+    
+    // En production, s'assurer que l'URL est correcte
+    if (!baseUrl || baseUrl.includes('localhost')) {
+      baseUrl = window.location.origin;
+    }
       const qrUrl = `${baseUrl}/r/${data.slug}`;
       console.log("QR Code URL:", qrUrl); // Debug log
       
@@ -120,7 +125,7 @@ export default function QRPage() {
             URL du QR code:
           </p>
           <p className="text-sm text-blue-600 font-mono bg-blue-50 rounded px-2 py-1">
-            {process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/r/{business.slug}
+            {typeof window !== 'undefined' ? window.location.origin : 'https://trustreview-eight.vercel.app'}/r/{business.slug}
           </p>
         </div>
 

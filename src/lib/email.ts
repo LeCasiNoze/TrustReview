@@ -53,7 +53,12 @@ export async function sendEmail(data: EmailData): Promise<boolean> {
 
 // Fonction pour envoyer un email de vérification
 export async function sendVerifyEmail(email: string, token: string): Promise<boolean> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://trustreview.vercel.app';
+  let baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+    
+    // En production, s'assurer que l'URL est correcte
+    if (!baseUrl || baseUrl.includes('localhost')) {
+      baseUrl = 'https://trustreview-eight.vercel.app'; // URL de production
+    }
   const verifyUrl = `${baseUrl}/auth/verify?token=${token}&email=${encodeURIComponent(email)}`;
   
   const html = `
@@ -315,7 +320,12 @@ Cet email a été envoyé automatiquement par TrustReview
 
 // Fonction pour envoyer un email de réinitialisation de mot de passe
 export async function sendResetPassword(email: string, token: string): Promise<boolean> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://trustreview.vercel.app';
+  let baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+    
+    // En production, s'assurer que l'URL est correcte
+    if (!baseUrl || baseUrl.includes('localhost')) {
+      baseUrl = 'https://trustreview-eight.vercel.app'; // URL de production
+    }
   const resetUrl = `${baseUrl}/auth/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
   
   const html = `

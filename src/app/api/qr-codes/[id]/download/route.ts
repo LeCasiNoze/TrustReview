@@ -46,7 +46,12 @@ export async function GET(
     }
     
     // Generate QR code URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://trustreview.fr'
+    let baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+    
+    // En production, s'assurer que l'URL est correcte
+    if (!baseUrl || baseUrl.includes('localhost')) {
+      baseUrl = 'https://trustreview-eight.vercel.app';
+    }
     const qrUrl = `${baseUrl}/r/${qrCode.businesses.slug}`
     
     // QR code settings

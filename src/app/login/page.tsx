@@ -55,9 +55,20 @@ export default function LoginPage() {
 
     const startTime = Date.now();
     
-    // URL de base sécurisée
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin;
+    // URL de base sécurisée - priorité à l'env var, fallback sur origin
+    let baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+    
+    // En production, s'assurer que l'URL est correcte
+    if (!baseUrl || baseUrl.includes('localhost')) {
+      baseUrl = window.location.origin;
+    }
+    
     const redirectUrl = `${baseUrl}/auth/callback`;
+    
+    // Debug en production
+    if (process.env.NODE_ENV === "production") {
+      console.log("🔐 Production login", { email, baseUrl, redirectUrl });
+    }
 
     if (process.env.NODE_ENV !== "production") {
       console.log("🔐 Login attempt started", { email, redirectUrl, startTime });
