@@ -44,46 +44,58 @@ export async function PUT(req: Request) {
   try {
     const { email, code } = await req.json();
     
+    console.log("🔍 Code verification attempt:", { email, code });
+    console.log("📋 Stored codes:", Array.from(loginCodes.entries()));
+    
     if (!email || !code) {
       return NextResponse.json({ error: "Email et code requis" }, { status: 400 });
     }
 
     const storedData = loginCodes.get(code);
     
+    console.log("🔍 Found stored data:", storedData);
+    
     if (!storedData) {
-      return NextResponse.json({ error: "Code invalide" }, { status: 400 });
+      console.log("❌ Code not found in storage");
+      return NextResponse.json({ error: "Code invalide - non trouvé" }, { status: 400 });
     }
 
     if (storedData.email !== email) {
+      console.log("❌ Email mismatch:", { stored: storedData.email, provided: email });
       return NextResponse.json({ error: "Code ne correspond pas à cet email" }, { status: 400 });
     }
 
     if (Date.now() > storedData.expires) {
+      console.log("❌ Code expired:", { now: Date.now(), expires: storedData.expires });
       loginCodes.delete(code);
       return NextResponse.json({ error: "Code expiré" }, { status: 400 });
     }
 
-    // Créer une session Supabase
-    const supabase = await createSupabaseServer();
-    const { data, error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { 
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`
-      }
-    });
+    console.log("✅ Code verification successful, creating session");
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    // Nettoyer le code utilisé
+    // Créer une session simple sans Supabase
     loginCodes.delete(code);
 
-    return NextResponse.json({
+    // Stocker la session dans un cookie
+    const response = NextResponse.json({
       success: true,
       message: "Connexion réussie",
-      redirectTo: "/auth/callback"
+      redirectTo: "/app"
     });
+
+    // Créer un cookie de session simple
+    response.cookies.set('temp-session', JSON.stringify({
+      email,
+      verified: true,
+      expires: Date.now() + 24 * 60 * 60 * 1000 // 24h
+    }), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 // 24h en secondes
+    });
+
+    return response;
 
   } catch (error) {
     console.error("Login code verification error:", error);

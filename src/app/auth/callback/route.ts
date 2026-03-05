@@ -4,7 +4,34 @@ import { redirect } from 'next/navigation'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
+  const email = searchParams.get('email')
+  const codeVerified = searchParams.get('code_verified')
   const next = searchParams.get('next') ?? '/app'
+
+  // Cas spécial : login par code vérifié
+  if (codeVerified === 'true' && email) {
+    console.log("🔐 Processing verified code login for:", email);
+    
+    // Créer une session Supabase pour cet email
+    const supabase = await createSupabaseServer()
+    
+    // Générer un magic link Supabase pour cet email
+    const { data, error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`
+      }
+    })
+
+    if (error) {
+      console.error("❌ Error creating Supabase session:", error)
+      redirect('/auth/error')
+    }
+
+    // Rediriger vers login avec un message spécial
+    const loginUrl = `${origin}/login?message=code-login-success&email=${encodeURIComponent(email)}`
+    redirect(loginUrl)
+  }
 
   if (code) {
     const supabase = await createSupabaseServer()
