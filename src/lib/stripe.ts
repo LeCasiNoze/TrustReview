@@ -2,15 +2,15 @@ import Stripe from 'stripe';
 
 // Configuration Stripe - À remplacer avec vos vraies clés
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_...', {
-  apiVersion: '2024-06-20',
+  apiVersion: '2026-02-25.clover',
 });
 
-// Plans Stripe - À créer dans votre dashboard Stripe
+// Plans Stripe - IDs réels
 export const STRIPE_PLANS = {
-  pro_monthly: 'price_1Oxxxxxxx', // Remplacer par votre vrai ID
-  pro_yearly: 'price_1Oxxxxxxx',   // Remplacer par votre vrai ID
-  agency_monthly: 'price_1Oxxxxxxx', // Remplacer par votre vrai ID
-  agency_yearly: 'price_1Oxxxxxxx',   // Remplacer par votre vrai ID
+  pro_monthly: 'prod_U5llyx37kYtWbK', // Pro mensuel
+  pro_yearly: 'prod_U5lmxddH8BdIfd',   // Pro annuel
+  agency_monthly: 'prod_U5lnBQGk10yELL', // Agence mensuel
+  agency_yearly: 'prod_U5loCUvGjrvfu5',   // Agence annuel
 };
 
 export async function createStripeCustomer(email: string, name?: string) {
