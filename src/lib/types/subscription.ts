@@ -31,6 +31,7 @@ export interface Subscription {
   created_at: string;
   updated_at: string;
   plan?: SubscriptionPlan; // jointure optionnelle
+  features?: Record<string, boolean>;
 }
 
 export interface Feature {
@@ -55,6 +56,7 @@ export interface QRColorPreset {
 export interface UserSubscriptionInfo {
   subscription: Subscription | null;
   plan: SubscriptionPlan | null;
+  features: Record<string, boolean>;
   canCreateQR: boolean;
   canCreateBusiness: boolean;
   remainingQRCodes: number | null;

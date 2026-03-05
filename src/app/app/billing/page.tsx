@@ -5,7 +5,6 @@ import { loadStripe } from "@stripe/stripe-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { getUserSubscriptionInfo, getSubscriptionPlans } from "@/lib/subscription";
 import { UserSubscriptionInfo, SubscriptionPlan } from "@/lib/types/subscription";
 
 export default function BillingPage() {
@@ -20,17 +19,24 @@ export default function BillingPage() {
 
   const loadData = async () => {
     try {
-      const [info, plansData] = await Promise.all([
-        getUserSubscriptionInfo(),
-        getSubscriptionPlans()
-      ]);
-      setSubscriptionInfo(info);
-      setPlans(plansData);
+      const res = await fetch("/api/billing", { cache: "no-store" });
+      const json = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(json.error || "Failed to load billing data");
+      }
+      
+      setSubscriptionInfo(json.info);
+      setPlans(json.plans);
     } catch (error) {
       console.error('Error loading billing data:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const hasFeature = (feature: string) => {
+    return subscriptionInfo?.features?.[feature] || false;
   };
 
   const handlePlanChange = async (planId: string, billingCycle: 'monthly' | 'yearly' = 'monthly') => {
