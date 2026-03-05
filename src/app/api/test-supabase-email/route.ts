@@ -9,11 +9,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email requis" }, { status: 400 });
     }
 
-    const supabase = await createSupabaseServer();
-    
     console.log("🧪 Testing Supabase email to:", email);
     console.log("📧 Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
     console.log("🔧 App URL:", process.env.NEXT_PUBLIC_APP_URL);
+    console.log("🔑 Supabase Anon Key:", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "Set" : "Missing");
+    
+    const supabase = await createSupabaseServer();
     
     // Test direct avec Supabase
     const { data, error } = await supabase.auth.signInWithOtp({
