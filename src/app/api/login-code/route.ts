@@ -80,7 +80,7 @@ export async function PUT(req: Request) {
     const response = NextResponse.json({
       success: true,
       message: "Connexion réussie",
-      redirectTo: "/app"
+      redirectTo: "/app/temp-welcome"
     });
 
     // Créer un cookie de session simple
