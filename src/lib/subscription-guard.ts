@@ -13,7 +13,7 @@ export async function checkSubscriptionAccess(): Promise<SubscriptionGuardResult
   try {
     const subscriptionInfo = await getUserSubscriptionInfo();
     
-    if (!subscriptionInfo.subscription || !subscriptionInfo.plan) {
+    if (!subscriptionInfo || !subscriptionInfo.subscription || !subscriptionInfo.plan) {
       return {
         canAccess: false,
         isExpired: true,
