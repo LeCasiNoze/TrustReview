@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import QRCode from "qrcode";
-import { getUserSubscriptionInfo, getQRColorPresets } from "@/lib/subscription";
 import { QRColorPreset } from "@/lib/types/subscription";
 
 interface QRCode {

@@ -6,8 +6,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { getUserBusinesses, createBusiness, setActiveBusiness, type Business } from "@/lib/business-manager";
-import { getUserSubscriptionInfo } from "@/lib/subscription";
+interface Business {
+  id: string;
+  name: string;
+  slug: string;
+  logo_url?: string;
+  google_review_url?: string;
+  threshold_positive?: number;
+  is_active: boolean;
+  created_at: string;
+}
 
 export default function BusinessesPage() {
   const [businessManager, setBusinessManager] = useState<any>(null);
@@ -28,12 +36,15 @@ export default function BusinessesPage() {
 
   const loadData = async () => {
     try {
-      const [manager, subscription] = await Promise.all([
-        getUserBusinesses(),
-        getUserSubscriptionInfo()
+      const [businessesResponse, billingResponse] = await Promise.all([
+        fetch("/api/businesses/user"),
+        fetch("/api/billing", { cache: "no-store" })
       ]);
-      setBusinessManager(manager);
-      setSubscriptionInfo(subscription);
+      
+      const businessesData = await businessesResponse.json();
+      const billingData = await billingResponse.json();
+      setBusinessManager(businessesData);
+      setSubscriptionInfo(billingData.info);
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -45,14 +56,22 @@ export default function BusinessesPage() {
     if (!newBusiness.name.trim()) return;
 
     try {
-      await createBusiness({
-        name: newBusiness.name,
-        slug: newBusiness.slug || newBusiness.name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-        google_review_url: newBusiness.google_review_url,
-        threshold_positive: newBusiness.threshold_positive,
-        is_active: newBusiness.is_active
+      const response = await fetch("/api/businesses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newBusiness.name,
+          slug: newBusiness.slug || newBusiness.name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+          google_review_url: newBusiness.google_review_url,
+          threshold_positive: newBusiness.threshold_positive,
+          is_active: newBusiness.is_active
+        })
       });
-
+      
+      if (!response.ok) {
+        throw new Error('Failed to create business');
+      }
+      
       setNewBusiness({
         name: "",
         slug: "",
@@ -64,13 +83,17 @@ export default function BusinessesPage() {
       await loadData();
     } catch (error) {
       console.error('Error creating business:', error);
-      alert(error instanceof Error ? error.message : 'Erreur lors de la création');
+      alert('Erreur lors de la création de l\'entreprise');
     }
   };
 
   const handleSetActiveBusiness = async (businessId: string) => {
     try {
-      await setActiveBusiness(businessId);
+      await fetch("/api/businesses/user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ businessId })
+      });
       await loadData();
     } catch (error) {
       console.error('Error setting active business:', error);

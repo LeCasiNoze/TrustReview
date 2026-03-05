@@ -3,7 +3,16 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { getUserBusinesses, setActiveBusiness, type Business } from "@/lib/business-manager";
+interface Business {
+  id: string;
+  name: string;
+  slug: string;
+  logo_url?: string;
+  google_review_url?: string;
+  threshold_positive?: number;
+  is_active: boolean;
+  created_at: string;
+}
 
 export default function BusinessSwitcher() {
   const [businessManager, setBusinessManager] = useState<any>(null);
@@ -16,8 +25,9 @@ export default function BusinessSwitcher() {
 
   const loadBusinesses = async () => {
     try {
-      const manager = await getUserBusinesses();
-      setBusinessManager(manager);
+      const response = await fetch("/api/businesses/user");
+      const data = await response.json();
+      setBusinessManager(data);
     } catch (error) {
       console.error('Error loading businesses:', error);
     } finally {
@@ -27,7 +37,11 @@ export default function BusinessSwitcher() {
 
   const handleBusinessChange = async (businessId: string) => {
     try {
-      await setActiveBusiness(businessId);
+      await fetch("/api/businesses/user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ businessId })
+      });
       await loadBusinesses(); // Recharger pour mettre à jour l'entreprise active
       setIsOpen(false);
       // Recharger la page pour appliquer le changement
