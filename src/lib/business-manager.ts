@@ -1,0 +1,193 @@
+import { createSupabaseServer } from './supabase-server';
+
+export interface Business {
+  id: string;
+  name: string;
+  slug: string;
+  logo_url?: string;
+  google_review_url?: string;
+  threshold_positive?: number;
+  is_active: boolean;
+  owner_user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BusinessManager {
+  businesses: Business[];
+  activeBusiness: Business | null;
+  canCreateMore: boolean;
+  remainingSlots: number | null;
+}
+
+export async function getUserBusinesses(): Promise<BusinessManager> {
+  const supabase = await createSupabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+
+  // Récupérer les infos d'abonnement pour vérifier les limites
+  const subscriptionResponse = await fetch('/api/subscription');
+  const subscriptionInfo = subscriptionResponse.ok ? await subscriptionResponse.json() : null;
+
+  // Récupérer toutes les entreprises de l'utilisateur
+  const { data: businesses, error } = await supabase
+    .from('businesses')
+    .select('*')
+    .eq('owner_user_id', user.id)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching businesses:', error);
+    throw error;
+  }
+
+  const businessList = businesses || [];
+  const maxBusinesses = subscriptionInfo?.plan?.max_businesses ?? null;
+  const canCreateMore = maxBusinesses === null || businessList.length < maxBusinesses;
+  const remainingSlots = maxBusinesses === null ? null : Math.max(0, maxBusinesses - businessList.length);
+
+  // Récupérer l'entreprise active depuis localStorage (côté client)
+  let activeBusiness: Business | null = null;
+  
+  if (typeof window !== 'undefined') {
+    const activeBusinessId = localStorage.getItem('activeBusinessId');
+    if (activeBusinessId) {
+      activeBusiness = businessList.find(b => b.id === activeBusinessId) || businessList[0] || null;
+    } else {
+      activeBusiness = businessList[0] || null;
+      if (activeBusiness) {
+        localStorage.setItem('activeBusinessId', activeBusiness.id);
+      }
+    }
+  } else {
+    // Côté serveur, prendre la première entreprise
+    activeBusiness = businessList[0] || null;
+  }
+
+  return {
+    businesses: businessList,
+    activeBusiness,
+    canCreateMore,
+    remainingSlots
+  };
+}
+
+export async function setActiveBusiness(businessId: string): Promise<void> {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('activeBusinessId', businessId);
+  }
+}
+
+export async function createBusiness(businessData: Partial<Business>): Promise<Business> {
+  const supabase = await createSupabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+
+  // Vérifier les limites d'abonnement
+  const businessManager = await getUserBusinesses();
+  if (!businessManager.canCreateMore) {
+    throw new Error(`Limite d'entreprises atteinte (${businessManager.businesses.length}/${businessManager.remainingSlots === null ? '∞' : businessManager.businesses.length + businessManager.remainingSlots})`);
+  }
+
+  const { data, error } = await supabase
+    .from('businesses')
+    .insert({
+      ...businessData,
+      owner_user_id: user.id,
+      is_active: businessData.is_active ?? true,
+      threshold_positive: businessData.threshold_positive ?? 4,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating business:', error);
+    throw error;
+  }
+
+  // Définir comme entreprise active si c'est la première
+  if (businessManager.businesses.length === 0) {
+    await setActiveBusiness(data.id);
+  }
+
+  return data;
+}
+
+export async function updateBusiness(businessId: string, updates: Partial<Business>): Promise<Business> {
+  const supabase = await createSupabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+
+  const { data, error } = await supabase
+    .from('businesses')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', businessId)
+    .eq('owner_user_id', user.id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating business:', error);
+    throw error;
+  }
+
+  return data;
+}
+
+export async function deleteBusiness(businessId: string): Promise<void> {
+  const supabase = await createSupabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+
+  // Vérifier que c'est bien l'entreprise de l'utilisateur
+  const { data: business } = await supabase
+    .from('businesses')
+    .select('id')
+    .eq('id', businessId)
+    .eq('owner_user_id', user.id)
+    .single();
+
+  if (!business) {
+    throw new Error('Business not found or access denied');
+  }
+
+  const { error } = await supabase
+    .from('businesses')
+    .delete()
+    .eq('id', businessId);
+
+  if (error) {
+    console.error('Error deleting business:', error);
+    throw error;
+  }
+
+  // Si c'était l'entreprise active, définir la première entreprise restante comme active
+  if (typeof window !== 'undefined') {
+    const activeBusinessId = localStorage.getItem('activeBusinessId');
+    if (activeBusinessId === businessId) {
+      const remainingBusinesses = await getUserBusinesses();
+      if (remainingBusinesses.businesses.length > 0) {
+        localStorage.setItem('activeBusinessId', remainingBusinesses.businesses[0].id);
+      } else {
+        localStorage.removeItem('activeBusinessId');
+      }
+    }
+  }
+}

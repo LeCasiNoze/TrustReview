@@ -1,0 +1,102 @@
+import { createSupabaseServer } from '@/lib/supabase-server'
+import { requireUserServer } from '@/lib/auth'
+import { redirect } from 'next/navigation'
+import { NextRequest, NextResponse } from 'next/server'
+
+export async function GET(request: NextRequest) {
+  try {
+    const user = await requireUserServer()
+    const supabase = await createSupabaseServer()
+    
+    // Get business for the user
+    const { data: business } = await supabase
+      .from('businesses')
+      .select('id')
+      .eq('owner_user_id', user.id)
+      .single()
+    
+    if (!business) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 })
+    }
+    
+    // Get QR codes for the business
+    const { data: qrCodes, error } = await supabase
+      .from('qr_codes')
+      .select('*')
+      .eq('business_id', business.id)
+      .order('created_at', { ascending: false })
+    
+    if (error) {
+      throw error
+    }
+    
+    return NextResponse.json({ qrCodes })
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('User not found')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const user = await requireUserServer()
+    const supabase = await createSupabaseServer()
+    
+    const formData = await request.formData()
+    
+    // Get business for the user
+    const { data: business } = await supabase
+      .from('businesses')
+      .select('id, name, slug')
+      .eq('owner_user_id', user.id)
+      .single()
+    
+    if (!business) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 })
+    }
+    
+    // Check QR code limit based on plan (for now, assume unlimited)
+    const { data: existingQRCodes } = await supabase
+      .from('qr_codes')
+      .select('id')
+      .eq('business_id', business.id)
+    
+    if (existingQRCodes && existingQRCodes.length >= 50) {
+      return NextResponse.json({ error: 'QR code limit reached' }, { status: 400 })
+    }
+    
+    const qrCodeData = {
+      business_id: business.id,
+      name: formData.get('name') as string || `QR Code ${existingQRCodes?.length ? existingQRCodes.length + 1 : 1}`,
+      location: formData.get('location') as string || '',
+      is_active: formData.get('is_active') === 'true',
+      custom_settings: JSON.stringify({
+        background_color: formData.get('background_color') || '#ffffff',
+        foreground_color: formData.get('foreground_color') || '#000000',
+        text: formData.get('text') || 'Scannez pour donner votre avis',
+        include_logo: formData.get('include_logo') === 'true'
+      }),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
+    
+    const { data: qrCode, error } = await supabase
+      .from('qr_codes')
+      .insert(qrCodeData)
+      .select()
+      .single()
+    
+    if (error) {
+      throw error
+    }
+    
+    return NextResponse.json({ qrCode })
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('User not found')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
