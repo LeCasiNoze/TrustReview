@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { loadStripe } from "@stripe/stripe-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,23 +33,34 @@ export default function BillingPage() {
     }
   };
 
-  const handlePlanChange = async (planId: string) => {
+  const handlePlanChange = async (planId: string, billingCycle: 'monthly' | 'yearly' = 'monthly') => {
     setUpdating(true);
     try {
-      // Pour le moment, utiliser l'API manuelle (Stripe à configurer plus tard)
-      const response = await fetch("/api/subscription", {
+      // Créer une session Stripe Checkout
+      const response = await fetch("/api/stripe/create-checkout-session", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ planId })
+        body: JSON.stringify({ planId, billingCycle })
       });
 
       if (response.ok) {
-        await loadData(); // Recharger les données
+        const { sessionId } = await response.json();
+        
+        // Rediriger vers Stripe Checkout
+        const stripe = await loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+        const { error } = await stripe!.redirectToCheckout({ sessionId });
+
+        if (error) {
+          console.error('Stripe checkout error:', error);
+          alert('Erreur lors du paiement. Veuillez réessayer.');
+        }
       } else {
-        console.error('Failed to update plan');
+        console.error('Failed to create checkout session');
+        alert('Erreur lors de la création de la session de paiement.');
       }
     } catch (error) {
       console.error('Error updating plan:', error);
+      alert('Erreur lors du paiement. Veuillez réessayer.');
     } finally {
       setUpdating(false);
     }
@@ -170,15 +182,31 @@ export default function BillingPage() {
                     </div>
                   </div>
 
-                  <Button 
-                    className="w-full"
-                    variant={isCurrentPlan ? "outline" : "default"}
-                    disabled={isCurrentPlan || updating}
-                    onClick={() => handlePlanChange(plan.id)}
-                  >
-                    {isCurrentPlan ? 'Abonnement actuel' : 
-                     updating ? 'Mise à jour...' : 'Changer de plan'}
-                  </Button>
+                  {plan.id === subscriptionInfo.plan?.id ? (
+                    <Button variant="default" disabled>
+                      Plan actuel
+                    </Button>
+                  ) : (
+                    <div className="space-y-2">
+                      <Button 
+                        variant="outline"
+                        onClick={() => handlePlanChange(plan.id, 'monthly')}
+                        disabled={updating}
+                        className="w-full"
+                      >
+                        {plan.monthly_price}€/mois
+                      </Button>
+                      <Button 
+                        variant="outline"
+                        onClick={() => handlePlanChange(plan.id, 'yearly')}
+                        disabled={updating}
+                        className="w-full"
+                      >
+                        {plan.yearly_price}€/an
+                        <span className="ml-1 text-xs text-green-600">-17%</span>
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );

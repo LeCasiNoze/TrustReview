@@ -5,6 +5,9 @@ export interface SubscriptionPlan {
   description: string;
   price_monthly: number; // en centimes
   price_yearly: number; // en centimes
+  price: number;
+  monthly_price: number;
+  yearly_price: number;
   trial_days: number;
   max_qr_codes: number | null;
   max_businesses: number | null;

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { stripe } from "@/lib/stripe";
 import { createSupabaseServer } from "@/lib/supabase-server";
+import Stripe from "stripe";
 
 export async function POST(req: Request) {
   const body = await req.text();
@@ -12,12 +13,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "No signature" }, { status: 400 });
   }
 
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET; // À configurer
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
+  }
 
-  let event: any;
+  let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret!);
   } catch (err: any) {
     console.error('Webhook signature verification failed:', err.message);
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
@@ -27,6 +31,9 @@ export async function POST(req: Request) {
 
   try {
     switch (event.type) {
+      case 'checkout.session.completed':
+        await handleCheckoutCompleted(event.data.object, supabase);
+        break;
       case 'invoice.payment_succeeded':
         const invoice = event.data.object;
         await handlePaymentSucceeded(invoice, supabase);
@@ -55,6 +62,32 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error('Webhook handler error:', error);
     return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
+  }
+}
+
+async function handleCheckoutCompleted(session: any, supabase: any) {
+  try {
+    const { user_id, plan_id, billing_cycle } = session.metadata;
+    
+    // Mettre à jour l'abonnement en base
+    const { error } = await supabase
+      .from('subscriptions')
+      .update({
+        plan_id: plan_id,
+        stripe_subscription_id: session.subscription,
+        status: 'active',
+        trial_end: null, // Fin de l'essai
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', user_id);
+
+    if (error) {
+      console.error('Error updating subscription after checkout:', error);
+    } else {
+      console.log('Subscription updated after checkout:', user_id, plan_id);
+    }
+  } catch (error) {
+    console.error('Error in handleCheckoutCompleted:', error);
   }
 }
 

@@ -7,10 +7,10 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_...',
 
 // Plans Stripe - À créer dans votre dashboard Stripe
 export const STRIPE_PLANS = {
-  pro_monthly: 'price_pro_monthly_id', // À remplacer
-  pro_yearly: 'price_pro_yearly_id',   // À remplacer  
-  agency_monthly: 'price_agency_monthly_id', // À remplacer
-  agency_yearly: 'price_agency_yearly_id',   // À remplacer
+  pro_monthly: 'price_1Oxxxxxxx', // Remplacer par votre vrai ID
+  pro_yearly: 'price_1Oxxxxxxx',   // Remplacer par votre vrai ID
+  agency_monthly: 'price_1Oxxxxxxx', // Remplacer par votre vrai ID
+  agency_yearly: 'price_1Oxxxxxxx',   // Remplacer par votre vrai ID
 };
 
 export async function createStripeCustomer(email: string, name?: string) {
