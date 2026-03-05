@@ -53,7 +53,8 @@ export async function sendEmail(data: EmailData): Promise<boolean> {
 
 // Fonction pour envoyer un email de vérification
 export async function sendVerifyEmail(email: string, token: string): Promise<boolean> {
-  const verifyUrl = `${process.env.NEXT_PUBLIC_APP_URL}/auth/verify?token=${token}&email=${encodeURIComponent(email)}`;
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://trustreview.vercel.app';
+  const verifyUrl = `${baseUrl}/auth/verify?token=${token}&email=${encodeURIComponent(email)}`;
   
   const html = `
     <!DOCTYPE html>
@@ -63,38 +64,227 @@ export async function sendVerifyEmail(email: string, token: string): Promise<boo
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Vérifiez votre email - TrustReview</title>
       <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-        .button { display: inline-block; background: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-        .footer { text-align: center; color: #666; font-size: 12px; margin-top: 30px; }
+        body { 
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; 
+          line-height: 1.6; 
+          color: #1a202c; 
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          margin: 0; 
+          padding: 20px; 
+          min-height: 100vh;
+        }
+        .container { 
+          max-width: 600px; 
+          margin: 0 auto; 
+          background: white; 
+          border-radius: 20px; 
+          overflow: hidden; 
+          box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        .header { 
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+          color: white; 
+          padding: 40px 30px; 
+          text-align: center; 
+          position: relative;
+        }
+        .header::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") repeat;
+          opacity: 0.3;
+        }
+        .header h1 { 
+          margin: 0; 
+          font-size: 32px; 
+          font-weight: 700; 
+          position: relative;
+          z-index: 1;
+        }
+        .header p { 
+          margin: 10px 0 0; 
+          opacity: 0.9; 
+          font-size: 16px;
+          position: relative;
+          z-index: 1;
+        }
+        .content { 
+          padding: 40px 30px; 
+          background: #f8fafc;
+        }
+        .welcome-box {
+          background: linear-gradient(135deg, #f6f9fc 0%, #e9ecef 100%);
+          border-radius: 15px;
+          padding: 25px;
+          margin-bottom: 30px;
+          border-left: 4px solid #667eea;
+        }
+        .welcome-box h2 {
+          margin: 0 0 15px 0;
+          color: #2d3748;
+          font-size: 24px;
+          font-weight: 600;
+        }
+        .welcome-box p {
+          margin: 0;
+          color: #4a5568;
+          font-size: 16px;
+          line-height: 1.6;
+        }
+        .button-container { 
+          text-align: center; 
+          margin: 35px 0; 
+        }
+        .button { 
+          display: inline-block; 
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+          color: white; 
+          padding: 16px 32px; 
+          text-decoration: none; 
+          border-radius: 50px; 
+          font-weight: 600; 
+          font-size: 16px;
+          box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+          transition: all 0.3s ease;
+          position: relative;
+          overflow: hidden;
+        }
+        .button::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+          transition: left 0.5s;
+        }
+        .button:hover::before {
+          left: 100%;
+        }
+        .fallback-link {
+          background: white;
+          border: 2px dashed #e2e8f0;
+          border-radius: 10px;
+          padding: 20px;
+          margin: 25px 0;
+        }
+        .fallback-link p {
+          margin: 0 0 10px 0;
+          color: #4a5568;
+          font-size: 14px;
+          font-weight: 500;
+        }
+        .fallback-link code {
+          display: block;
+          word-break: break-all; 
+          color: #667eea; 
+          background: #f7fafc;
+          padding: 12px;
+          border-radius: 6px;
+          font-family: 'Monaco', 'Menlo', monospace;
+          font-size: 13px;
+          border: 1px solid #e2e8f0;
+        }
+        .security-notice {
+          background: linear-gradient(135deg, #fef5e7 0%, #fdeaa8 100%);
+          border-radius: 10px;
+          padding: 20px;
+          margin: 25px 0;
+          border-left: 4px solid #f39c12;
+        }
+        .security-notice p {
+          margin: 0;
+          color: #8b6914;
+          font-size: 14px;
+          font-weight: 500;
+        }
+        .footer { 
+          text-align: center; 
+          color: #718096; 
+          font-size: 12px; 
+          padding: 30px;
+          background: white;
+          border-top: 1px solid #e2e8f0;
+        }
+        .footer p {
+          margin: 5px 0;
+        }
+        .logo {
+          width: 60px;
+          height: 60px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          border-radius: 15px;
+          margin: 0 auto 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 24px;
+          color: white;
+          font-weight: bold;
+          position: relative;
+          z-index: 1;
+        }
+        .shape {
+          position: absolute;
+          border-radius: 50%;
+          background: rgba(255,255,255,0.1);
+        }
+        .shape-1 {
+          width: 80px;
+          height: 80px;
+          top: -20px;
+          right: -20px;
+        }
+        .shape-2 {
+          width: 40px;
+          height: 40px;
+          bottom: 10px;
+          left: 20px;
+        }
       </style>
     </head>
     <body>
       <div class="container">
         <div class="header">
-          <h1>🔐 Vérifiez votre email</h1>
-          <p>Bienvenue sur TrustReview</p>
+          <div class="shape shape-1"></div>
+          <div class="shape shape-2"></div>
+          <div class="logo">TR</div>
+          <h1>🎉 Bienvenue sur TrustReview !</h1>
+          <p>Activez votre compte pour commencer</p>
         </div>
         
         <div class="content">
-          <h2>Merci de vous être inscrit !</h2>
-          <p>Pour activer votre compte, veuillez cliquer sur le bouton ci-dessous pour vérifier votre adresse email :</p>
-          
-          <div style="text-align: center;">
-            <a href="${verifyUrl}" class="button">Vérifier mon email</a>
+          <div class="welcome-box">
+            <h2>Merci de vous être inscrit !</h2>
+            <p>Vous êtes à quelques clics de pouvoir gérer vos avis clients et booster votre réputation en ligne.</p>
           </div>
           
-          <p>Si le bouton ne fonctionne pas, copiez-collez ce lien dans votre navigateur :</p>
-          <p style="word-break: break-all; color: #667eea;">${verifyUrl}</p>
+          <p style="text-align: center; color: #4a5568; font-size: 16px; margin: 0 0 25px 0;">
+            Pour activer votre compte, cliquez sur le bouton ci-dessous :
+          </p>
           
-          <p><strong>Ce lien expirera dans 24 heures.</strong></p>
+          <div class="button-container">
+            <a href="${verifyUrl}" class="button">✨ Activer mon compte</a>
+          </div>
+          
+          <div class="fallback-link">
+            <p>📋 Si le bouton ne fonctionne pas, copiez-collez ce lien dans votre navigateur :</p>
+            <code>${verifyUrl}</code>
+          </div>
+          
+          <div class="security-notice">
+            <p>⏰ Ce lien expirera dans 24 heures pour des raisons de sécurité.</p>
+          </div>
         </div>
         
         <div class="footer">
-          <p>Cet email a été envoyé automatiquement par TrustReview</p>
-          <p>Ne répondez pas à cet email</p>
+          <p><strong>Cet email a été envoyé automatiquement par TrustReview</strong></p>
+          <p>Ne répondez pas à cet email • Besoin d'aide ? contact@trustreview.fr</p>
         </div>
       </div>
     </body>
@@ -125,7 +315,8 @@ Cet email a été envoyé automatiquement par TrustReview
 
 // Fonction pour envoyer un email de réinitialisation de mot de passe
 export async function sendResetPassword(email: string, token: string): Promise<boolean> {
-  const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL}/auth/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://trustreview.vercel.app';
+  const resetUrl = `${baseUrl}/auth/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
   
   const html = `
     <!DOCTYPE html>
@@ -147,8 +338,8 @@ export async function sendResetPassword(email: string, token: string): Promise<b
     <body>
       <div class="container">
         <div class="header">
-          <h1>🔑 Réinitialisation du mot de passe</h1>
-          <p>TrustReview</p>
+          <h1>� Réinitialisation du mot de passe</h1>
+          <p>Sécurisez votre compte TrustReview</p>
         </div>
         
         <div class="content">
@@ -156,19 +347,15 @@ export async function sendResetPassword(email: string, token: string): Promise<b
           <p>Vous avez demandé à réinitialiser votre mot de passe. Cliquez sur le bouton ci-dessous pour définir un nouveau mot de passe :</p>
           
           <div style="text-align: center;">
-            <a href="${resetUrl}" class="button">Réinitialiser mon mot de passe</a>
+            <a href="${resetUrl}" class="button">🔐 Réinitialiser mon mot de passe</a>
           </div>
           
           <p>Si le bouton ne fonctionne pas, copiez-collez ce lien dans votre navigateur :</p>
           <p style="word-break: break-all; color: #667eea;">${resetUrl}</p>
           
           <div class="warning">
-            <p><strong>⚠️ Important :</strong></p>
-            <ul>
-              <li>Ce lien expirera dans 1 heure</li>
-              <li>Si vous n'avez pas demandé cette réinitialisation, ignorez cet email</li>
-              <li>Ne partagez jamais ce lien avec personne</li>
-            </ul>
+            <p><strong>⏰ Sécurité :</strong> Ce lien expirera dans 1 heure pour des raisons de sécurité.</p>
+            <p><strong>🛡️ Protection :</strong> Si vous n'avez pas demandé cette réinitialisation, vous pouvez ignorer cet email en toute sécurité.</p>
           </div>
         </div>
         
@@ -229,11 +416,11 @@ export async function sendContactEmail(email: string, message: string, name?: st
       <div class="container">
         <div class="header">
           <h1>📬 Nouveau message de contact</h1>
-          <p>TrustReview</p>
+          <p>Un client potentiel vous contacte</p>
         </div>
         
         <div class="content">
-          <h2>Vous avez reçu un nouveau message</h2>
+          <h2>🎯 Nouveau message client</h2>
           
           <div class="info">
             <p><strong>De :</strong> ${name || email}</p>
@@ -250,7 +437,8 @@ export async function sendContactEmail(email: string, message: string, name?: st
         </div>
         
         <div class="footer">
-          <p>Cet email a été envoyé automatiquement par TrustReview</p>
+          <p><strong>Cet email a été envoyé automatiquement par TrustReview</strong></p>
+          <p>Répondez directement au client : ${email}</p>
         </div>
       </div>
     </body>
