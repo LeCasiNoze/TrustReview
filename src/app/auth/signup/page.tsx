@@ -20,29 +20,8 @@ export default function Signup() {
     setIsLoading(false)
     setMessage("")
 
-    try {
-      const supabase = createSupabaseBrowser()
-      
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`
-        }
-      })
-
-      if (error) {
-        setMessage(error.message)
-        setMessageType("error")
-      } else {
-        setMessage("Check your email for the magic link!")
-        setMessageType("success")
-      }
-    } catch (error) {
-      setMessage("An unexpected error occurred")
-      setMessageType("error")
-    } finally {
-      setIsLoading(false)
-    }
+    // Rediriger vers la page de login pour l'inscription
+    router.push('/login')
   }
 
   return (

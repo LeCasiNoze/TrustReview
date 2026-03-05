@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createSupabaseBrowser } from "@/lib/supabase-browser";
 
 export default function LoginPage() {
@@ -10,28 +10,110 @@ export default function LoginPage() {
   const [isError, setIsError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+
+  // Timer pour le cooldown
+  useEffect(() => {
+    if (cooldownSeconds > 0) {
+      const timer = setTimeout(() => {
+        setCooldownSeconds(cooldownSeconds - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldownSeconds]);
+
+  // Fonction pour mapper les erreurs en français
+  function mapErrorMessage(error: string): string {
+    if (error.toLowerCase().includes('rate limit')) {
+      return "Trop de demandes. Attends 1 minute puis réessaie.";
+    }
+    if (error.toLowerCase().includes('invalid') || error.toLowerCase().includes('credentials')) {
+      return "Email invalide.";
+    }
+    if (error.toLowerCase().includes('network') || error.toLowerCase().includes('timeout')) {
+      return "Service email lent. Réessaie dans 1 minute.";
+    }
+    return error;
+  }
+
+  // Fonction pour démarrer le cooldown
+  function startCooldown(seconds: number = 60) {
+    setCooldownSeconds(seconds);
+  }
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    
+    // Anti double-submit
+    if (loading || cooldownSeconds > 0) {
+      return;
+    }
+    
     setLoading(true);
     setMsg(null);
     setIsError(false);
 
-    const origin = window.location.origin;
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: `${origin}/auth/callback` },
+    const startTime = Date.now();
+    
+    // URL de base sécurisée
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin;
+    const redirectUrl = `${baseUrl}/auth/callback`;
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log("🔐 Login attempt started", { email, redirectUrl, startTime });
+    }
+
+    // Timeout client de 12 secondes
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("TIMEOUT")), 12000);
     });
 
-    setLoading(false);
+    try {
+      const result = await Promise.race([
+        supabase.auth.signInWithOtp({
+          email,
+          options: { emailRedirectTo: redirectUrl },
+        }),
+        timeoutPromise
+      ]);
 
-    if (error) {
-      setMsg(error.message);
-      setIsError(true);
-      return;
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      if (process.env.NODE_ENV !== "production") {
+        console.log("✅ Login attempt completed", { duration, success: true });
+      }
+
+      setLoading(false);
+      setSent(true);
+      setMsg("Lien de connexion envoyé ! Vérifiez votre boîte mail (et les spams).");
+      startCooldown(60); // Cooldown de 60s après succès
+
+    } catch (error: any) {
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      if (process.env.NODE_ENV !== "production") {
+        console.log("❌ Login attempt failed", { duration, error: error.message });
+      }
+
+      setLoading(false);
+
+      if (error.message === "TIMEOUT") {
+        setMsg("L'envoi du mail prend trop de temps. Réessaie dans 1 minute.");
+        setIsError(true);
+        startCooldown(60); // Cooldown de 60s après timeout
+      } else {
+        const mappedError = mapErrorMessage(error.message);
+        setMsg(mappedError);
+        setIsError(true);
+        
+        // Cooldown pour rate limiting
+        if (error.message.toLowerCase().includes('rate limit')) {
+          startCooldown(60);
+        }
+      }
     }
-    setSent(true);
-    setMsg("Lien de connexion envoyé ! Vérifiez votre boîte mail (et les spams).");
   }
 
   return (
@@ -111,12 +193,16 @@ export default function LoginPage() {
 
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || cooldownSeconds > 0}
                   className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
                   style={{
-                    background: "linear-gradient(135deg, hsl(226 71% 55%), hsl(226 71% 50%))",
+                    background: loading || cooldownSeconds > 0 
+                      ? "hsl(224 30% 20%)" 
+                      : "linear-gradient(135deg, hsl(226 71% 55%), hsl(226 71% 50%))",
                     color: "white",
-                    boxShadow: "0 1px 3px rgba(66, 99, 235, 0.4), inset 0 1px 0 rgba(255,255,255,0.1)",
+                    boxShadow: loading || cooldownSeconds > 0 
+                      ? "none" 
+                      : "0 1px 3px rgba(66, 99, 235, 0.4), inset 0 1px 0 rgba(255,255,255,0.1)",
                   }}
                 >
                   {loading ? (
@@ -125,6 +211,14 @@ export default function LoginPage() {
                         <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
                       </svg>
                       Envoi en cours…
+                    </>
+                  ) : cooldownSeconds > 0 ? (
+                    <>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                      </svg>
+                      Renvoyer dans {cooldownSeconds}s
                     </>
                   ) : (
                     <>
@@ -165,11 +259,16 @@ export default function LoginPage() {
                 Vérifiez aussi vos spams.
               </p>
               <button
-                onClick={() => { setSent(false); setMsg(null); }}
-                className="mt-4 text-xs font-medium transition-colors"
-                style={{ color: "hsl(220 10% 50%)" }}
+                onClick={() => { 
+                  setSent(false); 
+                  setMsg(null); 
+                  setIsError(false);
+                }}
+                disabled={cooldownSeconds > 0}
+                className="mt-4 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ color: cooldownSeconds > 0 ? "hsl(220 10% 25%)" : "hsl(220 10% 50%)" }}
               >
-                Utiliser une autre adresse
+                {cooldownSeconds > 0 ? `Utiliser une autre adresse (${cooldownSeconds}s)` : "Utiliser une autre adresse"}
               </button>
             </div>
           )}
