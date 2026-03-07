@@ -100,10 +100,26 @@ export async function POST(req: Request) {
     const priceIdKey = `${planId}_${billingCycle}` as keyof typeof STRIPE_PLANS;
     const priceId = STRIPE_PLANS[priceIdKey];
     
-    if (!priceId || !priceId.startsWith('price_')) {
+    console.log("🔍 [STRIPE DEBUG] Résolution Price ID:", {
+      planId,
+      billingCycle,
+      priceIdKey,
+      priceId,
+      priceIdPresent: !!priceId,
+      priceIdFormat: priceId?.startsWith('price_') ? 'VALID' : 'INVALID'
+    });
+    
+    if (!priceId) {
+      return NextResponse.json({ 
+        error: "Price ID non configuré",
+        details: `Price ID pour ${planId} ${billingCycle} non trouvé. Variable d'environnement manquante: STRIPE_PRICE_${planId.toUpperCase()}_${billingCycle.toUpperCase()}`
+      }, { status: 500 });
+    }
+    
+    if (!priceId.startsWith('price_')) {
       return NextResponse.json({ 
         error: "Price ID invalide",
-        details: `Price ID pour ${planId} ${billingCycle} non trouvé ou invalide. Attendu: price_..., reçu: ${priceId}`
+        details: `Price ID pour ${planId} ${billingCycle} invalide. Attendu: price_..., reçu: ${priceId}. Vérifiez vos variables d'environnement STRIPE_PRICE_*`
       }, { status: 500 });
     }
 
@@ -145,6 +161,16 @@ export async function POST(req: Request) {
     }
 
     // 8. Créer la session Checkout
+    console.log("🔍 [STRIPE DEBUG] Création session avec:", {
+      customerId,
+      priceId,
+      planId,
+      billingCycle,
+      priceIdFormat: priceId.startsWith('price_') ? 'VALID' : 'INVALID',
+      stripeKeyPresent: !!process.env.STRIPE_SECRET_KEY,
+      stripeKeyPrefix: process.env.STRIPE_SECRET_KEY?.substring(0, 7) + '...'
+    });
+
     try {
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
@@ -172,13 +198,25 @@ export async function POST(req: Request) {
         },
       });
 
+      console.log("✅ [STRIPE DEBUG] Session créée:", session.id);
       return NextResponse.json({ sessionId: session.id });
 
     } catch (stripeError) {
-      console.error("❌ Erreur création session Stripe:", stripeError);
+      console.error("❌ [STRIPE DEBUG] Erreur création session Stripe:", {
+        error: stripeError,
+        message: stripeError instanceof Error ? stripeError.message : 'Unknown error',
+        type: stripeError?.constructor?.name,
+        stack: stripeError instanceof Error ? stripeError.stack : undefined,
+        requestId: (stripeError as any)?.requestId,
+        code: (stripeError as any)?.code,
+        statusCode: (stripeError as any)?.statusCode
+      });
+      
       return NextResponse.json({ 
         error: "Erreur création session Stripe",
-        details: stripeError instanceof Error ? stripeError.message : 'Unknown error'
+        details: stripeError instanceof Error ? stripeError.message : 'Unknown error',
+        code: (stripeError as any)?.code,
+        requestId: (stripeError as any)?.requestId
       }, { status: 500 });
     }
 

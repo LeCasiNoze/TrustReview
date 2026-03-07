@@ -5,15 +5,28 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_...',
   apiVersion: '2024-11-20.acacia',
 } as any);
 
-// Plans Stripe - Price IDs (pas Product IDs!)
+// Plans Stripe - Price IDs depuis variables d'environnement
 export const STRIPE_PLANS = {
-  // Ces IDs doivent être des price_... créés dans Stripe Dashboard
-  // Si vous n'avez pas de price IDs, utilisez les prix de test ci-dessous
-  pro_monthly: 'price_1OQx7Z2eZvKYlo2C7Z6K8m7J', // Pro mensuel - 19.99€
-  pro_yearly: 'price_1OQx8J2eZvKYlo2C7Z6K8n8K',   // Pro annuel - 49.99€
-  agency_monthly: 'price_1OQx8J2eZvKYlo2C7Z6K8n8K', // Agence mensuel - 19.99€
-  agency_yearly: 'price_1OQx8J2eZvKYlo2C7Z6K8n8K',   // Agence annuel - 49.99€
+  pro_monthly: process.env.STRIPE_PRICE_PRO_MONTHLY,
+  pro_yearly: process.env.STRIPE_PRICE_PRO_YEARLY,
+  agency_monthly: process.env.STRIPE_PRICE_AGENCY_MONTHLY,
+  agency_yearly: process.env.STRIPE_PRICE_AGENCY_YEARLY,
 };
+
+// Validation des Price IDs au démarrage
+const requiredPriceIds = [
+  'STRIPE_PRICE_PRO_MONTHLY',
+  'STRIPE_PRICE_PRO_YEARLY', 
+  'STRIPE_PRICE_AGENCY_MONTHLY',
+  'STRIPE_PRICE_AGENCY_YEARLY'
+];
+
+const missingPriceIds = requiredPriceIds.filter(key => !process.env[key]);
+
+if (missingPriceIds.length > 0) {
+  console.error(`❌ Variables d'environnement manquantes pour les Price IDs: ${missingPriceIds.join(', ')}`);
+  console.error(`❌ Ajoutez ces variables dans Vercel Environment Variables avec vos vrais Price IDs (price_...)`);
+}
 
 export async function createStripeCustomer(email: string, name?: string) {
   try {

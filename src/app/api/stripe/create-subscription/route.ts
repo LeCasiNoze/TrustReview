@@ -41,16 +41,21 @@ export async function POST(req: Request) {
     }
 
     // Déterminer le prix Stripe selon le plan et le cycle de facturation
-    let priceId: string;
-    switch (planId) {
-      case 'pro':
-        priceId = billingCycle === 'yearly' ? STRIPE_PLANS.pro_yearly : STRIPE_PLANS.pro_monthly;
-        break;
-      case 'agency':
-        priceId = billingCycle === 'yearly' ? STRIPE_PLANS.agency_yearly : STRIPE_PLANS.agency_monthly;
-        break;
-      default:
-        return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
+    const priceIdKey = `${planId}_${billingCycle}` as keyof typeof STRIPE_PLANS;
+    const priceId = STRIPE_PLANS[priceIdKey];
+    
+    if (!priceId) {
+      return NextResponse.json({ 
+        error: "Price ID non configuré",
+        details: `Price ID pour ${planId} ${billingCycle} non trouvé. Variable d'environnement manquante: STRIPE_PRICE_${planId.toUpperCase()}_${billingCycle.toUpperCase()}`
+      }, { status: 500 });
+    }
+    
+    if (!priceId.startsWith('price_')) {
+      return NextResponse.json({ 
+        error: "Price ID invalide",
+        details: `Price ID pour ${planId} ${billingCycle} invalide. Attendu: price_..., reçu: ${priceId}`
+      }, { status: 500 });
     }
 
     // Créer l'abonnement Stripe
