@@ -10,10 +10,17 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Si session temporaire, retourner des données factices
+    // Si session temporaire, récupérer les entreprises avec l'email
     if (auth.isTempSession) {
+      const supabase = await createSupabaseServer();
+      const { data: businesses } = await supabase
+        .from('businesses')
+        .select('*')
+        .eq('owner_user_id', auth.email)
+        .order('created_at', { ascending: false });
+      
       return NextResponse.json({
-        businesses: [],
+        businesses: Array.isArray(businesses) ? businesses : [],
         activeBusinessId: null,
         canCreateMore: true,
         remainingSlots: null
@@ -32,7 +39,7 @@ export async function GET() {
     const { data: businesses } = await supabase
       .from('businesses')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('owner_user_id', user.id)
       .order('created_at', { ascending: false });
 
     // Get active business
