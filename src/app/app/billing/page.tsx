@@ -11,6 +11,22 @@ import { UserSubscriptionInfo, SubscriptionPlan } from "@/lib/types/subscription
 // Plans statiques pour l'affichage
 const STATIC_PLANS = [
   {
+    id: 'starter',
+    name: 'Starter',
+    description: 'Parfait pour démarrer',
+    price_monthly: 0, // Gratuit avec essai
+    price_yearly: 0, // Gratuit avec essai
+    max_qr_codes: 5,
+    max_businesses: 1,
+    features: [
+      'Essai gratuit 7 jours',
+      'Jusqu\'à 5 QR codes',
+      '1 entreprise',
+      'Analytics de base',
+      'Support email'
+    ]
+  },
+  {
     id: 'pro',
     name: 'Pro',
     description: 'Parfait pour les petites entreprises',
@@ -28,23 +44,20 @@ const STATIC_PLANS = [
     ]
   },
   {
-    id: 'agence',
+    id: 'agency',
     name: 'Agence',
     description: 'Idéal pour les agences et grandes entreprises',
-    price_monthly: 1999, // 19.99€ (même prix pour le moment)
-    price_yearly: 4999, // 49.99€ (même prix pour le moment)
+    price_monthly: 4900, // 49.00€
+    price_yearly: 49000, // 490.00€
     max_qr_codes: null, // Illimité
-    max_businesses: null, // Illimité
+    max_businesses: 10,
     features: [
       'QR codes illimités',
-      'Entreprises illimitées',
+      'Jusqu\'à 10 entreprises',
       'Analytics avancées',
       'Support prioritaire',
       'Export des données',
-      'Branding personnalisé',
-      'API d\'accès',
-      'Intégrations avancées',
-      'Account manager dédié'
+      'Branding personnalisé'
     ]
   }
 ];

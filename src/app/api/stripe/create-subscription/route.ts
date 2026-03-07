@@ -40,6 +40,24 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No Stripe customer found" }, { status: 400 });
     }
 
+    // Validation des plans (harmonisés: starter, pro, agency)
+    const validPlans = ['starter', 'pro', 'agency'];
+    const validCycles = ['monthly', 'yearly'];
+    
+    if (!validPlans.includes(planId)) {
+      return NextResponse.json({ 
+        error: "Plan invalide",
+        details: `Plan "${planId}" non valide. Plans disponibles: ${validPlans.join(', ')}`
+      }, { status: 400 });
+    }
+    
+    if (!validCycles.includes(billingCycle)) {
+      return NextResponse.json({ 
+        error: "Cycle invalide", 
+        details: `Cycle "${billingCycle}" non valide. Cycles disponibles: ${validCycles.join(', ')}`
+      }, { status: 400 });
+    }
+
     // Déterminer le prix Stripe selon le plan et le cycle de facturation
     const priceIdKey = `${planId}_${billingCycle}` as keyof typeof STRIPE_PLANS;
     const priceId = STRIPE_PLANS[priceIdKey];
@@ -54,7 +72,7 @@ export async function POST(req: Request) {
     if (!priceId.startsWith('price_')) {
       return NextResponse.json({ 
         error: "Price ID invalide",
-        details: `Price ID pour ${planId} ${billingCycle} invalide. Attendu: price_..., reçu: ${priceId}. Mettez à jour src/lib/stripe.ts avec vos vrais Price IDs`
+        details: `Price ID pour ${planId} ${billingCycle} invalide. Attendu: price_..., reçu: ${priceId}`
       }, { status: 500 });
     }
 

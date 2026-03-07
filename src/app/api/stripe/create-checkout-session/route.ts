@@ -27,26 +27,29 @@ export async function POST(req: Request) {
 
     const { planId, billingCycle = 'monthly' } = body;
     
-    // 3. Validation des paramètres
-    if (!planId || typeof planId !== 'string') {
+    // 5. Validation des inputs
+    if (!planId || !billingCycle) {
       return NextResponse.json({ 
-        error: "Plan ID invalide",
-        details: "planId est requis et doit être une chaîne"
+        error: "Paramètres manquants",
+        details: "planId et billingCycle sont requis"
       }, { status: 400 });
     }
 
-    if (!['monthly', 'yearly'].includes(billingCycle)) {
+    // Plans valides (harmonisés: starter, pro, agency)
+    const validPlans = ['starter', 'pro', 'agency'];
+    const validCycles = ['monthly', 'yearly'];
+    
+    if (!validPlans.includes(planId)) {
       return NextResponse.json({ 
-        error: "Billing cycle invalide",
-        details: "billingCycle doit être 'monthly' ou 'yearly'"
+        error: "Plan invalide",
+        details: `Plan "${planId}" non valide. Plans disponibles: ${validPlans.join(', ')}`
       }, { status: 400 });
     }
-
-    // 4. Validation des plans supportés
-    if (!['pro', 'agency'].includes(planId)) {
+    
+    if (!validCycles.includes(billingCycle)) {
       return NextResponse.json({ 
-        error: "Plan non supporté",
-        details: "Les plans supportés sont: pro, agency"
+        error: "Cycle invalide", 
+        details: `Cycle "${billingCycle}" non valide. Cycles disponibles: ${validCycles.join(', ')}`
       }, { status: 400 });
     }
 

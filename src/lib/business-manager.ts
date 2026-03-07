@@ -30,8 +30,17 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
   }
 
   // Récupérer les infos d'abonnement pour vérifier les limites
-  const subscriptionResponse = await fetch('/api/subscription');
-  const subscriptionInfo = subscriptionResponse.ok ? await subscriptionResponse.json() : null;
+  // Utiliser la logique côté serveur directement
+  const { data: subscription } = await supabase
+    .from('subscriptions')
+    .select(`
+      *,
+      plan:subscription_plans(slug, max_businesses)
+    `)
+    .eq('user_id', user.id)
+    .single();
+
+  const maxBusinesses = subscription?.plan?.max_businesses ?? 1; // Default starter limit
 
   // Récupérer toutes les entreprises de l'utilisateur
   const { data: businesses, error } = await supabase
@@ -46,7 +55,6 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
   }
 
   const businessList = businesses || [];
-  const maxBusinesses = subscriptionInfo?.plan?.max_businesses ?? null;
   const canCreateMore = maxBusinesses === null || businessList.length < maxBusinesses;
   const remainingSlots = maxBusinesses === null ? null : Math.max(0, maxBusinesses - businessList.length);
 

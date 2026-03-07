@@ -75,14 +75,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
     }
     
-    // Check QR code limit based on plan (for now, assume unlimited)
+    // Check QR code limit based on user's plan
     const { data: existingQRCodes } = await supabase
       .from('qr_codes')
       .select('id')
       .eq('business_id', business.id)
     
-    if (existingQRCodes && existingQRCodes.length >= 50) {
-      return NextResponse.json({ error: 'QR code limit reached' }, { status: 400 })
+    // Get user's subscription info to check quotas
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (!authUser) {
+      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+    }
+    
+    // Get subscription plan
+    const { data: subscription } = await supabase
+      .from('subscriptions')
+      .select(`
+        *,
+        plan:subscription_plans(slug, max_qr_codes)
+      `)
+      .eq('user_id', authUser.id)
+      .single();
+    
+    // Determine max QR codes based on plan
+    let maxQRCodes: number | null = 5; // Default starter limit
+    if (subscription?.plan?.slug === 'pro') {
+      maxQRCodes = 50;
+    } else if (subscription?.plan?.slug === 'agency') {
+      maxQRCodes = null; // Unlimited
+    }
+    
+    // Check limit (only if not unlimited)
+    if (maxQRCodes !== null && existingQRCodes && existingQRCodes.length >= maxQRCodes) {
+      return NextResponse.json({ 
+        error: 'QR code limit reached', 
+        details: `Maximum ${maxQRCodes} QR codes allowed for ${subscription?.plan?.slug || 'starter'} plan`
+      }, { status: 400 });
     }
     
     const qrCodeData = {

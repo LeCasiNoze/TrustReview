@@ -5,14 +5,35 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_...',
   apiVersion: '2024-11-20.acacia',
 } as any);
 
-// Plans Stripe - Price IDs (à remplacer avec vos vrais IDs)
+// Plans Stripe - Price IDs réels
 export const STRIPE_PLANS = {
-  // Remplacez ces IDs par vos vrais Price IDs depuis Stripe Dashboard
-  // Format: price_xxxxxxxxxxxxxx
-  pro_monthly: 'price_1OQx7Z2eZvKYlo2C7Z6K8m7J',    // Pro mensuel - 19.99€
-  pro_yearly: 'price_1OQx8J2eZvKYlo2C7Z6K8n8K',      // Pro annuel - 49.99€
-  agency_monthly: 'price_1OQx8J2eZvKYlo2C7Z6K8n8K',  // Agence mensuel - 19.99€
-  agency_yearly: 'price_1OQx8J2eZvKYlo2C7Z6K8n8K',    // Agence annuel - 49.99€
+  // STARTER (gratuit avec essai)
+  starter_monthly: 'price_1T8Pd7Cs7QihwvO39gMZnAGr',
+  starter_yearly: 'price_1T8Pd7Cs7QihwvO389ZmeGjU',
+  
+  // PRO
+  pro_monthly: 'price_1T8PdzCs7QihwvO3E0IlaJwB',
+  pro_yearly: 'price_1T8PdzCs7QihwvO3z5PmAJqb',
+  
+  // AGENCY
+  agency_monthly: 'price_1T8PeqCs7QihwvO3vlLvxxD2',
+  agency_yearly: 'price_1T8Pf7Cs7QihwvO3RoUmrpmG',
+};
+
+// Quotas par plan
+export const PLAN_QUOTAS = {
+  starter: {
+    max_businesses: 1,
+    max_qr_codes: 5,
+  },
+  pro: {
+    max_businesses: 3,
+    max_qr_codes: 50,
+  },
+  agency: {
+    max_businesses: 10,
+    max_qr_codes: null, // Illimité
+  },
 };
 
 export async function createStripeCustomer(email: string, name?: string) {
