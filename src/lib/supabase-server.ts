@@ -28,9 +28,16 @@ export async function createSupabaseServer() {
 }
 
 export async function createSupabaseServiceClient() {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (!serviceRoleKey) {
+    console.warn("⚠️ SUPABASE_SERVICE_ROLE_KEY non défini, utilisation du client standard");
+    return createSupabaseServer();
+  }
+
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    serviceRoleKey,
     {
       cookies: {
         getAll() {
