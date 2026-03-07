@@ -57,8 +57,8 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
       }
     };
     subscriptionError = null;
-    // Générer un vrai UUID aléatoire pour les sessions temporaires
-    userId = randomUUID();
+    // Pour les sessions temporaires, utiliser l'email comme identifiant (compatible avec RLS)
+    userId = auth.email;
   } else {
     userId = auth.user.id;
     console.log("🏢 [BUSINESS-MANAGER] Récupération abonnement pour user:", userId);
@@ -210,8 +210,8 @@ export async function createBusiness(businessData: Partial<Business>): Promise<B
   // Déterminer l'ID utilisateur selon le type d'authentification
   let userId: string;
   if (auth.isTempSession) {
-    // Générer un vrai UUID aléatoire pour les sessions temporaires
-    userId = randomUUID();
+    // Pour les sessions temporaires, utiliser l'email comme identifiant (cohérent avec getUserBusinesses)
+    userId = auth.email;
   } else {
     userId = auth.user.id; // Pour les sessions Supabase, stocker l'UUID
   }
