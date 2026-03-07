@@ -190,7 +190,7 @@ export default function BillingPage() {
           <p className="text-muted-foreground">Gérez votre abonnement et vos factures</p>
         </div>
         {/* Bouton admin caché - uniquement en dev */}
-        {process.env.NODE_ENV === 'development' && (
+        {(process.env.NODE_ENV !== 'production') && (
           <Button
             variant="outline"
             size="sm"

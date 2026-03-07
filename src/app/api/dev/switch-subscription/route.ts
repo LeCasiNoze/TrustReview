@@ -4,7 +4,7 @@ import { createSupabaseServer } from "@/lib/supabase-server";
 export async function POST(req: Request) {
   try {
     // SÉCURITÉ: Uniquement en développement ou pour l'admin
-    const isDev = process.env.NODE_ENV === 'development';
+    const isDev = process.env.NODE_ENV !== 'production';
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@trustreview.test';
     
     const supabase = await createSupabaseServer();
