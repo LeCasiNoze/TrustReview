@@ -25,13 +25,17 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
   const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   
+  console.log("🏢 [BUSINESS-MANAGER] getUserBusinesses appelé, user:", user?.email);
+  
   if (!user) {
+    console.log("🏢 [BUSINESS-MANAGER] User non authentifié");
     throw new Error('User not authenticated');
   }
 
   // Récupérer les infos d'abonnement pour vérifier les limites
   // Utiliser la logique côté serveur directement
-  const { data: subscription } = await supabase
+  console.log("🏢 [BUSINESS-MANAGER] Récupération abonnement pour user:", user.id);
+  const { data: subscription, error: subscriptionError } = await supabase
     .from('subscriptions')
     .select(`
       *,
@@ -40,9 +44,20 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
     .eq('user_id', user.id)
     .single();
 
+  if (subscriptionError) {
+    console.error("🏢 [BUSINESS-MANAGER] Erreur récupération abonnement:", subscriptionError);
+  }
+
+  console.log("🏢 [BUSINESS-MANAGER] Subscription trouvée:", subscription ? {
+    plan: subscription.plan?.slug,
+    max_businesses: subscription.plan?.max_businesses
+  } : 'null');
+
   const maxBusinesses = subscription?.plan?.max_businesses ?? 1; // Default starter limit
+  console.log("🏢 [BUSINESS-MANAGER] maxBusinesses calculé:", maxBusinesses);
 
   // Récupérer toutes les entreprises de l'utilisateur
+  console.log("🏢 [BUSINESS-MANAGER] Récupération entreprises pour user:", user.id);
   const { data: businesses, error } = await supabase
     .from('businesses')
     .select('*')
@@ -50,13 +65,22 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Error fetching businesses:', error);
+    console.error('🏢 [BUSINESS-MANAGER] Error fetching businesses:', error);
     throw error;
   }
 
   const businessList = businesses || [];
+  console.log("🏢 [BUSINESS-MANAGER] Entreprises trouvées:", businessList.length);
+  
   const canCreateMore = maxBusinesses === null || businessList.length < maxBusinesses;
   const remainingSlots = maxBusinesses === null ? null : Math.max(0, maxBusinesses - businessList.length);
+  
+  console.log("🏢 [BUSINESS-MANAGER] Calcul quotas:", {
+    businessListLength: businessList.length,
+    maxBusinesses,
+    canCreateMore,
+    remainingSlots
+  });
 
   // Récupérer l'entreprise active depuis localStorage (côté client)
   let activeBusiness: Business | null = null;
