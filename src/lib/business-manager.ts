@@ -1,5 +1,6 @@
 import { createSupabaseServer } from './supabase-server';
 import { authenticateRequest } from './auth-middleware';
+import { randomUUID } from 'crypto';
 
 export interface Business {
   id: string;
@@ -43,22 +44,34 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
   // Récupérer les infos d'abonnement pour vérifier les limites
   // Utiliser la logique côté serveur directement
   let userId: string;
+  let subscription, subscriptionError;
+  
   if (auth.isTempSession) {
-    // Pour les sessions temporaires, utiliser l'email comme identifiant
-    userId = auth.email;
+    // Pour les sessions temporaires, créer un abonnement par défaut et générer un UUID basé sur l'email
+    console.log("🏢 [BUSINESS-MANAGER] Session temporaire détectée, utilisation abonnement starter par défaut");
+    subscription = {
+      plan: {
+        slug: 'starter',
+        max_businesses: 1
+      }
+    };
+    subscriptionError = null;
+    // Générer un UUID déterministe basé sur l'email pour les sessions temporaires
+    userId = `temp-${Buffer.from(auth.email).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 30)}`;
   } else {
     userId = auth.user.id;
+    console.log("🏢 [BUSINESS-MANAGER] Récupération abonnement pour user:", userId);
+    const result = await supabase
+      .from('subscriptions')
+      .select(`
+        *,
+        plan:subscription_plans(slug, max_businesses)
+      `)
+      .eq('user_id', userId)
+      .single();
+    subscription = result.data;
+    subscriptionError = result.error;
   }
-  
-  console.log("🏢 [BUSINESS-MANAGER] Récupération abonnement pour user:", userId);
-  const { data: subscription, error: subscriptionError } = await supabase
-    .from('subscriptions')
-    .select(`
-      *,
-      plan:subscription_plans(slug, max_businesses)
-    `)
-    .eq('user_id', userId)
-    .single();
 
   if (subscriptionError) {
     console.error("🏢 [BUSINESS-MANAGER] Erreur récupération abonnement:", subscriptionError);
@@ -74,11 +87,26 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
 
   // Récupérer toutes les entreprises de l'utilisateur
   console.log("🏢 [BUSINESS-MANAGER] Récupération entreprises pour user:", userId);
-  const { data: businesses, error } = await supabase
-    .from('businesses')
-    .select('*')
-    .eq('owner_user_id', userId)
-    .order('created_at', { ascending: false });
+  let businesses, error;
+  
+  if (auth.isTempSession) {
+    // Pour les sessions temporaires, chercher par email au lieu de UUID
+    const result = await supabase
+      .from('businesses')
+      .select('*')
+      .eq('owner_user_id', userId)
+      .order('created_at', { ascending: false });
+    businesses = result.data;
+    error = result.error;
+  } else {
+    const result = await supabase
+      .from('businesses')
+      .select('*')
+      .eq('owner_user_id', userId)
+      .order('created_at', { ascending: false });
+    businesses = result.data;
+    error = result.error;
+  }
 
   if (error) {
     console.error('🏢 [BUSINESS-MANAGER] Error fetching businesses:', error);
@@ -149,10 +177,13 @@ export async function createBusiness(businessData: Partial<Business>): Promise<B
   // Déterminer l'ID utilisateur selon le type d'authentification
   let userId: string;
   if (auth.isTempSession) {
-    userId = auth.email;
+    // Générer le même UUID déterministe basé sur l'email
+    userId = `temp-${Buffer.from(auth.email).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 30)}`;
   } else {
-    userId = auth.user.id;
+    userId = auth.user.id; // Pour les sessions Supabase, stocker l'UUID
   }
+
+  console.log("🏢 [BUSINESS-MANAGER] Création entreprise avec userId:", userId, "isTempSession:", auth.isTempSession);
 
   const { data, error } = await supabase
     .from('businesses')
