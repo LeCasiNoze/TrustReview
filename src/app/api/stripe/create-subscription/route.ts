@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createStripeSubscription, STRIPE_PLANS } from "@/lib/stripe";
 import { createSupabaseServer } from "@/lib/supabase-server";
 import { getUserSubscriptionInfoServer } from "@/lib/subscription.server";
+import { authenticateRequest } from "@/lib/auth-middleware";
 import Stripe from 'stripe';
 
 export async function POST(req: Request) {
@@ -10,6 +11,19 @@ export async function POST(req: Request) {
     
     if (!planId || !billingCycle) {
       return NextResponse.json({ error: "Plan and billing cycle are required" }, { status: 400 });
+    }
+
+    // Vérifier l'authentification (Supabase ou temporaire)
+    const auth = await authenticateRequest();
+    
+    if (!auth.isAuthenticated) {
+      return NextResponse.json({ error: "User not authenticated" }, { status: 401 });
+    }
+
+    // Pour les sessions temporaires, cette API n'est pas utilisée
+    // On utilise create-checkout-session à la place
+    if (auth.isTempSession) {
+      return NextResponse.json({ error: "Use checkout session for temp users" }, { status: 400 });
     }
 
     const supabase = await createSupabaseServer();

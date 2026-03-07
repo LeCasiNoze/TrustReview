@@ -11,6 +11,22 @@ import { UserSubscriptionInfo, SubscriptionPlan } from "@/lib/types/subscription
 // Plans statiques pour l'affichage
 const STATIC_PLANS = [
   {
+    id: 'offert',
+    name: 'Offert',
+    description: 'Pour découvrir TrustReview',
+    price_monthly: 0, // Gratuit
+    price_yearly: 0,
+    max_qr_codes: 5,
+    max_businesses: 1,
+    features: [
+      '5 QR codes',
+      '1 entreprise',
+      'Analytics de base',
+      'Support communautaire'
+    ],
+    isFree: true
+  },
+  {
     id: 'pro',
     name: 'Pro',
     description: 'Parfait pour les petites entreprises',
@@ -130,7 +146,26 @@ export default function BillingPage() {
   const handlePlanChange = async (planId: string, billingCycle: 'monthly' | 'yearly' = 'monthly') => {
     setUpdating(true);
     try {
-      // Créer une session Stripe Checkout
+      // Pour le plan offert, pas besoin de Stripe
+      if (planId === 'offert') {
+        const response = await fetch("/api/billing/switch-plan", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ planId: 'offert' })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to switch to free plan");
+        }
+        
+        // Recharger les données
+        await loadData();
+        return;
+      }
+
+      // Créer une session Stripe Checkout pour les plans payants
       const response = await fetch("/api/stripe/create-checkout-session", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -322,7 +357,7 @@ export default function BillingPage() {
       {/* Available Plans */}
       <div>
         <h2 className="text-xl font-semibold mb-4">Choisir votre abonnement</h2>
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-3 gap-6">
           {STATIC_PLANS.map((plan: any) => {
             const isCurrentPlan = subscriptionInfo?.plan?.id === plan.id;
             const monthlyPrice = plan.price_monthly / 100;
@@ -347,15 +382,17 @@ export default function BillingPage() {
                 <CardContent className="space-y-4">
                   <div>
                     <div className="text-3xl font-bold">
-                      {monthlyPrice}€
+                      {plan.isFree ? 'Gratuit' : `${monthlyPrice}€`}
                       <span className="text-sm font-normal text-muted-foreground">
-                        /mois
+                        {!plan.isFree && '/mois'}
                       </span>
                     </div>
                     
-                    <div className="text-sm text-green-600">
-                      Annuel : {yearlyPrice}€ (économisez {yearlySavings}€)
-                    </div>
+                    {!plan.isFree && (
+                      <div className="text-sm text-green-600">
+                        Annuel : {yearlyPrice}€ (économisez {yearlySavings}€)
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -389,6 +426,15 @@ export default function BillingPage() {
                   {isCurrentPlan ? (
                     <Button variant="default" disabled className="w-full">
                       Plan actuel
+                    </Button>
+                  ) : plan.isFree ? (
+                    <Button 
+                      onClick={() => handlePlanChange(plan.id, 'monthly')}
+                      disabled={updating}
+                      className="w-full"
+                      variant="outline"
+                    >
+                      Choisir le plan offert
                     </Button>
                   ) : (
                     <div className="space-y-2">

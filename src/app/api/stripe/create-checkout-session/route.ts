@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { stripe, STRIPE_PLANS } from "@/lib/stripe";
 import { createSupabaseServer } from "@/lib/supabase-server";
-import { getUserSubscriptionInfo } from "@/lib/subscription";
+import { authenticateRequest } from "@/lib/auth-middleware";
 
 export async function POST(req: Request) {
   try {
@@ -11,16 +11,48 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Plan ID requis" }, { status: 400 });
     }
 
-    // Récupérer les infos de l'utilisateur
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Vérifier l'authentification (Supabase ou temporaire)
+    const auth = await authenticateRequest();
     
-    if (!user) {
+    if (!auth.isAuthenticated) {
       return NextResponse.json({ error: "Utilisateur non authentifié" }, { status: 401 });
     }
 
-    // Récupérer les infos d'abonnement
-    const subscriptionInfo = await getUserSubscriptionInfo();
+    // Pour les sessions temporaires, créer un client Stripe avec l'email
+    let user = null;
+    let customerId: string | null = null;
+    
+    if (auth.isTempSession) {
+      // Session temporaire : créer un client directement
+      const customer = await stripe.customers.create({
+        email: auth.email,
+        name: auth.email,
+        metadata: {
+          source: 'trustreview_temp_session',
+          temp_session: 'true'
+        }
+      });
+      customerId = customer.id;
+    } else {
+      // Session Supabase normale
+      const supabase = await createSupabaseServer();
+      const { data: { user: supabaseUser } } = await supabase.auth.getUser();
+      
+      if (!supabaseUser) {
+        return NextResponse.json({ error: "Utilisateur non authentifié" }, { status: 401 });
+      }
+      
+      user = supabaseUser;
+      
+      // Récupérer les infos d'abonnement existant
+      const { data: subscription } = await supabase
+        .from('subscriptions')
+        .select('stripe_customer_id')
+        .eq('user_id', user.id)
+        .single();
+      
+      customerId = subscription?.stripe_customer_id || null;
+    }
     
     // Déterminer le price ID Stripe
     let priceId: string;
@@ -35,10 +67,8 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Plan invalide" }, { status: 400 });
     }
 
-    // Créer ou récupérer le client Stripe
-    let customerId = subscriptionInfo?.subscription?.stripe_customer_id;
-        if (!customerId) {
-          
+    // Créer le client Stripe si nécessaire
+    if (!customerId && user) {
       const customer = await stripe.customers.create({
         email: user.email!,
         name: user.user_metadata?.name || user.email!,
@@ -49,16 +79,19 @@ export async function POST(req: Request) {
       });
       customerId = customer.id;
 
-      // Sauvegarder le customer ID en base
-      await supabase
-        .from('subscriptions')
-        .update({ stripe_customer_id: customerId })
-        .eq('user_id', user.id);
+      // Sauvegarder le customer ID en base pour les sessions Supabase
+      if (!auth.isTempSession) {
+        const supabase = await createSupabaseServer();
+        await supabase
+          .from('subscriptions')
+          .update({ stripe_customer_id: customerId })
+          .eq('user_id', user.id);
+      }
     }
 
     // Créer la session Checkout
     const session = await stripe.checkout.sessions.create({
-      customer: customerId,
+      customer: customerId!,
       payment_method_types: ['card'],
       mode: 'subscription',
       line_items: [
@@ -70,15 +103,17 @@ export async function POST(req: Request) {
       success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://trustreview-eight.vercel.app'}/app/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://trustreview-eight.vercel.app'}/app/billing?canceled=true`,
       metadata: {
-        user_id: user.id,
+        user_id: user?.id || auth.email,
         plan_id: planId,
         billing_cycle: billingCycle,
+        is_temp_session: auth.isTempSession ? 'true' : 'false'
       },
       subscription_data: {
         metadata: {
-          user_id: user.id,
+          user_id: user?.id || auth.email,
           plan_id: planId,
           billing_cycle: billingCycle,
+          is_temp_session: auth.isTempSession ? 'true' : 'false'
         },
       },
     });
