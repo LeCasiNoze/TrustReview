@@ -8,14 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { UserSubscriptionInfo, SubscriptionPlan } from "@/lib/types/subscription";
 
-// Plans statiques pour l'affichage
+// Plans statiques pour l'affichage (prix en centimes)
 const STATIC_PLANS = [
   {
     id: 'starter',
     name: 'Starter',
     description: 'Parfait pour démarrer',
-    price_monthly: 0, // Gratuit avec essai
-    price_yearly: 0, // Gratuit avec essai
+    price_monthly: 1900, // 19€
+    price_yearly: 19000, // 190€
     max_qr_codes: 5,
     max_businesses: 1,
     features: [
@@ -30,8 +30,8 @@ const STATIC_PLANS = [
     id: 'pro',
     name: 'Pro',
     description: 'Parfait pour les petites entreprises',
-    price_monthly: 1999, // 19.99€
-    price_yearly: 4999, // 49.99€
+    price_monthly: 3900, // 39€
+    price_yearly: 39000, // 390€
     max_qr_codes: 50,
     max_businesses: 3,
     features: [
@@ -47,8 +47,8 @@ const STATIC_PLANS = [
     id: 'agency',
     name: 'Agence',
     description: 'Idéal pour les agences et grandes entreprises',
-    price_monthly: 4900, // 49.00€
-    price_yearly: 49000, // 490.00€
+    price_monthly: 7900, // 79€
+    price_yearly: 79000, // 790€
     max_qr_codes: null, // Illimité
     max_businesses: 10,
     features: [
@@ -419,7 +419,7 @@ export default function BillingPage() {
                         className="w-full"
                       >
                         {yearlyPrice}€/an
-                        <span className="ml-1 text-xs text-green-600">-58%</span>
+                        <span className="ml-1 text-xs text-green-600">-17%</span>
                       </Button>
                     </div>
                   )}

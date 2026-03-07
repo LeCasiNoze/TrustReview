@@ -20,10 +20,12 @@ export async function GET() {
     // Session temporaire = créer un trial factice
     if (auth.isTempSession) {
       const trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      const trialDaysLeft = 7; // Toujours 7 jours pour les sessions temporaires
       return NextResponse.json({
         isAuthenticated: true,
         hasSubscriptionActive: true,
         isTrialActive: true,
+        trialDaysLeft,
         isTrialAvailable: false,
         subscriptionStatus: 'trialing',
         needsOnboarding: false,
@@ -74,10 +76,20 @@ export async function GET() {
     const isTrialAvailable = !subscription || subscription.status === 'none';
     const needsOnboarding = !subscription || (!hasSubscriptionActive && !isTrialActive);
 
+    // Calculer les jours restants du trial
+    let trialDaysLeft = 0;
+    if (isTrialActive && subscription?.trial_end) {
+      const trialEnd = new Date(subscription.trial_end);
+      const now = new Date();
+      const diffTime = trialEnd.getTime() - now.getTime();
+      trialDaysLeft = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    }
+
     return NextResponse.json({
       isAuthenticated: true,
       hasSubscriptionActive,
       isTrialActive,
+      trialDaysLeft,
       isTrialAvailable,
       subscriptionStatus: subscription?.status || 'none',
       needsOnboarding,
