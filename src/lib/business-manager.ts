@@ -171,6 +171,15 @@ export async function createBusiness(businessData: Partial<Business>): Promise<B
   // Utiliser le middleware d'authentification
   const auth = await authenticateRequest();
   
+  // LOGS DIAGNOSTIC - Étape 1: Type de session
+  console.log("🔍 [DIAG] Session type detected:", {
+    isAuthenticated: auth.isAuthenticated,
+    isTempSession: auth.isTempSession,
+    email: auth.email,
+    hasUser: !!auth.user,
+    userId: auth.user?.id
+  });
+  
   if (!auth.isAuthenticated) {
     throw new Error('User not authenticated');
   }
@@ -181,8 +190,30 @@ export async function createBusiness(businessData: Partial<Business>): Promise<B
     throw new Error(`Limite d'entreprises atteinte (${businessManager.businesses.length}/${businessManager.remainingSlots === null ? '∞' : businessManager.businesses.length + businessManager.remainingSlots})`);
   }
 
-  // Utiliser le client approprié selon le type d'authentification
-  const supabase = auth.isTempSession ? await createSupabaseServiceClient() : await createSupabaseServer();
+  // LOGS DIAGNOSTIC - Étape 2: Variables d'environnement
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  console.log("🔍 [DIAG] Environment variables:", {
+    hasServiceRoleKey: !!serviceRoleKey,
+    serviceRoleKeyLength: serviceRoleKey?.length || 0,
+    hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+    hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  });
+
+  // LOGS DIAGNOSTIC - Étape 3: Choix du client
+  let clientType: string;
+  let supabase;
+  
+  if (auth.isTempSession) {
+    console.log("🔍 [DIAG] Temp session detected, attempting service role client...");
+    supabase = await createSupabaseServiceClient();
+    clientType = "createSupabaseServiceClient()";
+  } else {
+    console.log("🔍 [DIAG] Normal Supabase session, using standard client...");
+    supabase = await createSupabaseServer();
+    clientType = "createSupabaseServer()";
+  }
+  
+  console.log("🔍 [DIAG] Client selected:", clientType);
   
   // Déterminer l'ID utilisateur selon le type d'authentification
   let userId: string;
@@ -201,7 +232,14 @@ export async function createBusiness(businessData: Partial<Business>): Promise<B
     userId = auth.user.id; // Pour les sessions Supabase, stocker l'UUID
   }
 
-  console.log("🏢 [BUSINESS-MANAGER] Création entreprise avec userId:", userId, "isTempSession:", auth.isTempSession);
+  // LOGS DIAGNOSTIC - Étape 4: Juste avant l'insert
+  console.log("🔍 [DIAG] PRE-INSERT ANALYSIS:", {
+    sessionType: auth.isTempSession ? "TEMPORARY" : "SUPABASE",
+    clientUsed: clientType,
+    owner_user_id: userId,
+    serviceRoleKeyPresent: !!serviceRoleKey,
+    willUseServiceRole: auth.isTempSession && !!serviceRoleKey
+  });
 
   const { data, error } = await supabase
     .from('businesses')
@@ -216,8 +254,23 @@ export async function createBusiness(businessData: Partial<Business>): Promise<B
     .select()
     .single();
 
+  // LOGS DIAGNOSTIC - Étape 5: Résultat de l'insert
+  console.log("🔍 [DIAG] POST-INSERT RESULT:", {
+    success: !error,
+    error: error ? {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint
+    } : null,
+    dataId: data?.id,
+    sessionType: auth.isTempSession ? "TEMPORARY" : "SUPABASE",
+    clientUsed: clientType,
+    owner_user_id: userId
+  });
+
   if (error) {
-    console.error('Error creating business:', error);
+    console.error('🔍 [DIAG] INSERT FAILED:', error);
     throw error;
   }
 

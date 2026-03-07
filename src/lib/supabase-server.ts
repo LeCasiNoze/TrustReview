@@ -42,15 +42,23 @@ export async function createSupabaseServiceClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+  console.log("🔍 [DIAG] createSupabaseServiceClient called:", {
+    hasSupabaseUrl: !!supabaseUrl,
+    hasServiceRoleKey: !!serviceRoleKey,
+    serviceRoleKeyLength: serviceRoleKey?.length || 0
+  });
+
   if (!supabaseUrl) {
     throw new Error("❌ Configuration Supabase manquante: NEXT_PUBLIC_SUPABASE_URL n'est pas défini. Ajoutez cette variable d'environnement dans votre configuration.");
   }
 
   if (!serviceRoleKey) {
     console.warn("⚠️ SUPABASE_SERVICE_ROLE_KEY non défini, utilisation du client standard pour les sessions temporaires");
+    console.log("🔍 [DIAG] FALLBACK TRIGGERED: Using createSupabaseServer() instead of service role");
     return createSupabaseServer();
   }
 
+  console.log("🔍 [DIAG] SUCCESS: Creating service role client with valid keys");
   return createServerClient(
     supabaseUrl,
     serviceRoleKey,
