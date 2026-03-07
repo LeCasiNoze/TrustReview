@@ -1,4 +1,4 @@
-import { createSupabaseServer } from './supabase-server';
+import { createSupabaseServer, createSupabaseServiceClient } from './supabase-server';
 import { authenticateRequest } from './auth-middleware';
 import { randomUUID } from 'crypto';
 
@@ -39,7 +39,8 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
     throw new Error('User not authenticated');
   }
 
-  const supabase = await createSupabaseServer();
+  // Utiliser service role pour les sessions temporaires afin de contourner RLS
+  const supabase = auth.isTempSession ? await createSupabaseServiceClient() : await createSupabaseServer();
 
   // Récupérer les infos d'abonnement pour vérifier les limites
   // Utiliser la logique côté serveur directement
@@ -172,7 +173,8 @@ export async function createBusiness(businessData: Partial<Business>): Promise<B
     throw new Error(`Limite d'entreprises atteinte (${businessManager.businesses.length}/${businessManager.remainingSlots === null ? '∞' : businessManager.businesses.length + businessManager.remainingSlots})`);
   }
 
-  const supabase = await createSupabaseServer();
+  // Utiliser service role pour les sessions temporaires afin de contourner RLS
+  const supabase = auth.isTempSession ? await createSupabaseServiceClient() : await createSupabaseServer();
   
   // Déterminer l'ID utilisateur selon le type d'authentification
   let userId: string;
