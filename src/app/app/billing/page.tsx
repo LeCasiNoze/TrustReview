@@ -8,9 +8,49 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { UserSubscriptionInfo, SubscriptionPlan } from "@/lib/types/subscription";
 
+// Plans statiques pour l'affichage
+const STATIC_PLANS = [
+  {
+    id: 'pro',
+    name: 'Pro',
+    description: 'Parfait pour les petites entreprises',
+    price_monthly: 2900, // 29€
+    price_yearly: 29000, // 290€ (17% de réduction)
+    max_qr_codes: 50,
+    max_businesses: 3,
+    features: [
+      'Jusqu\'à 50 QR codes',
+      'Jusqu\'à 3 entreprises',
+      'Analytics avancées',
+      'Support email',
+      'Export des données',
+      'Branding personnalisé'
+    ]
+  },
+  {
+    id: 'agence',
+    name: 'Agence',
+    description: 'Idéal pour les agences et grandes entreprises',
+    price_monthly: 8900, // 89€
+    price_yearly: 89000, // 890€ (17% de réduction)
+    max_qr_codes: null, // Illimité
+    max_businesses: null, // Illimité
+    features: [
+      'QR codes illimités',
+      'Entreprises illimitées',
+      'Analytics avancées',
+      'Support prioritaire',
+      'Export des données',
+      'Branding personnalisé',
+      'API d\'accès',
+      'Intégrations avancées',
+      'Account manager dédié'
+    ]
+  }
+];
+
 export default function BillingPage() {
-  const [subscriptionInfo, setSubscriptionInfo] = useState<UserSubscriptionInfo | null>(null);
-  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [subscriptionInfo, setSubscriptionInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
 
@@ -28,8 +68,7 @@ export default function BillingPage() {
       }
       
       // Utiliser les données de l'API
-      setSubscriptionInfo(json.subscription);
-      setPlans(json.plan ? [json.plan] : []);
+      setSubscriptionInfo(json);
       
       console.log("📊 Billing data loaded:", {
         subscription: json.subscription,
@@ -53,7 +92,6 @@ export default function BillingPage() {
         trialDaysLeft: 0,
         hasFeature: () => false
       });
-      setPlans([]);
     } finally {
       setLoading(false);
     }
@@ -66,9 +104,11 @@ export default function BillingPage() {
   const handleStartTrial = async () => {
     setUpdating(true);
     try {
+      // Démarrer l'essai gratuit du plan Pro
       const response = await fetch("/api/billing/start-trial", {
         method: "POST",
-        headers: { "content-type": "application/json" }
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ planId: 'pro' })
       });
 
       const data = await response.json();
@@ -77,8 +117,8 @@ export default function BillingPage() {
         throw new Error(data.error || "Failed to start trial");
       }
 
-      // Rediriger vers Stripe Checkout
-      window.location.href = data.checkoutUrl;
+      // Recharger les données pour montrer le trial actif
+      await loadData();
     } catch (error) {
       console.error('Error starting trial:', error);
       alert('Erreur lors du démarrage de l\'essai. Veuillez réessayer.');
@@ -281,10 +321,10 @@ export default function BillingPage() {
 
       {/* Available Plans */}
       <div>
-        <h2 className="text-xl font-semibold mb-4">Changer d'abonnement</h2>
-        <div className="grid md:grid-cols-3 gap-6">
-          {plans.map((plan) => {
-            const isCurrentPlan = currentPlan?.id === plan.id;
+        <h2 className="text-xl font-semibold mb-4">Choisir votre abonnement</h2>
+        <div className="grid md:grid-cols-2 gap-6">
+          {STATIC_PLANS.map((plan: any) => {
+            const isCurrentPlan = subscriptionInfo?.plan?.id === plan.id;
             const monthlyPrice = plan.price_monthly / 100;
             const yearlyPrice = plan.price_yearly / 100;
             const yearlySavings = monthlyPrice * 12 - yearlyPrice;
@@ -307,17 +347,15 @@ export default function BillingPage() {
                 <CardContent className="space-y-4">
                   <div>
                     <div className="text-3xl font-bold">
-                      {monthlyPrice === 0 ? 'Gratuit' : `${monthlyPrice}€`}
+                      {monthlyPrice}€
                       <span className="text-sm font-normal text-muted-foreground">
-                        {monthlyPrice > 0 && '/mois'}
+                        /mois
                       </span>
                     </div>
                     
-                    {yearlyPrice > 0 && (
-                      <div className="text-sm text-green-600">
-                        Annuel : {yearlyPrice}€ (économisez {yearlySavings}€)
-                      </div>
-                    )}
+                    <div className="text-sm text-green-600">
+                      Annuel : {yearlyPrice}€ (économisez {yearlySavings}€)
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -335,19 +373,31 @@ export default function BillingPage() {
                     </div>
                   </div>
 
-                  {plan.id === subscriptionInfo.plan?.id ? (
-                    <Button variant="default" disabled>
+                  <div className="space-y-1">
+                    {plan.features.map((feature: string, index: number) => (
+                      <div key={index} className="flex items-center gap-2 text-sm">
+                        <div className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center">
+                          <svg className="w-2.5 h-2.5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <span>{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {isCurrentPlan ? (
+                    <Button variant="default" disabled className="w-full">
                       Plan actuel
                     </Button>
                   ) : (
                     <div className="space-y-2">
                       <Button 
-                        variant="outline"
                         onClick={() => handlePlanChange(plan.id, 'monthly')}
                         disabled={updating}
                         className="w-full"
                       >
-                        {plan.monthly_price}€/mois
+                        {monthlyPrice}€/mois
                       </Button>
                       <Button 
                         variant="outline"
@@ -355,7 +405,7 @@ export default function BillingPage() {
                         disabled={updating}
                         className="w-full"
                       >
-                        {plan.yearly_price}€/an
+                        {yearlyPrice}€/an
                         <span className="ml-1 text-xs text-green-600">-17%</span>
                       </Button>
                     </div>

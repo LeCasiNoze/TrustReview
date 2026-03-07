@@ -1,0 +1,120 @@
+import { NextResponse } from "next/server";
+import { createSupabaseServer } from "@/lib/supabase-server";
+import { authenticateRequest } from "@/lib/auth-middleware";
+
+export async function POST(req: Request) {
+  try {
+    const auth = await authenticateRequest();
+    
+    if (!auth.isAuthenticated) {
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    }
+
+    const { planId } = await req.json();
+    
+    if (!planId || planId !== 'pro') {
+      return NextResponse.json({ error: "Plan non valide" }, { status: 400 });
+    }
+
+    // Pour les sessions temporaires, créer un trial directement
+    if (auth.isTempSession) {
+      const trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      
+      return NextResponse.json({
+        success: true,
+        message: "Essai gratuit démarré avec succès",
+        trial: {
+          id: 'temp-trial-pro',
+          status: 'trialing',
+          trial_end: trialEnd.toISOString(),
+          created_at: new Date().toISOString()
+        },
+        plan: {
+          id: 'pro',
+          name: 'Pro',
+          slug: 'pro',
+          max_businesses: 3,
+          max_qr_codes: 50
+        }
+      });
+    }
+
+    // Pour les sessions Supabase, créer le trial en base
+    const supabase = await createSupabaseServer();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
+    }
+
+    // Vérifier si un abonnement existe déjà
+    const { data: existingSubscription } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+
+    if (existingSubscription && existingSubscription.status !== 'none') {
+      return NextResponse.json({ error: "Un abonnement existe déjà" }, { status: 400 });
+    }
+
+    // Récupérer le plan Pro
+    const { data: proPlan } = await supabase
+      .from('subscription_plans')
+      .select('*')
+      .eq('slug', 'pro')
+      .single();
+
+    if (!proPlan) {
+      return NextResponse.json({ error: "Plan Pro non trouvé" }, { status: 404 });
+    }
+
+    // Créer ou mettre à jour l'abonnement avec le trial
+    const trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    
+    const { data: subscription, error } = existingSubscription 
+      ? await supabase
+          .from('subscriptions')
+          .update({
+            plan_id: proPlan.id,
+            status: 'trialing',
+            trial_end: trialEnd.toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingSubscription.id)
+          .select()
+          .single()
+      : await supabase
+          .from('subscriptions')
+          .insert({
+            user_id: user.id,
+            plan_id: proPlan.id,
+            status: 'trialing',
+            trial_end: trialEnd.toISOString(),
+            stripe_subscription_id: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+    if (error) {
+      console.error("Error creating trial:", error);
+      return NextResponse.json({ error: "Erreur lors de la création du trial" }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Essai gratuit démarré avec succès",
+      subscription,
+      plan: proPlan
+    });
+
+  } catch (error) {
+    console.error("Error in start-trial:", error);
+    return NextResponse.json({ 
+      error: "Erreur serveur",
+      details: error instanceof Error ? error.message : "Unknown error"
+    }, { status: 500 });
+  }
+}
