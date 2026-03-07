@@ -1,4 +1,5 @@
 import { createSupabaseServer } from './supabase-server';
+import { authenticateRequest } from './auth-middleware';
 
 export interface Business {
   id: string;
@@ -22,26 +23,41 @@ export interface BusinessManager {
 }
 
 export async function getUserBusinesses(): Promise<BusinessManager> {
-  const supabase = await createSupabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
+  console.log("🏢 [BUSINESS-MANAGER] getUserBusinesses appelé");
   
-  console.log("🏢 [BUSINESS-MANAGER] getUserBusinesses appelé, user:", user?.email);
+  // Utiliser le middleware d'authentification qui gère les sessions temporaires
+  const auth = await authenticateRequest();
+  console.log("🏢 [BUSINESS-MANAGER] Auth result:", {
+    isAuthenticated: auth.isAuthenticated,
+    isTempSession: auth.isTempSession,
+    email: auth.email
+  });
   
-  if (!user) {
+  if (!auth.isAuthenticated) {
     console.log("🏢 [BUSINESS-MANAGER] User non authentifié");
     throw new Error('User not authenticated');
   }
 
+  const supabase = await createSupabaseServer();
+
   // Récupérer les infos d'abonnement pour vérifier les limites
   // Utiliser la logique côté serveur directement
-  console.log("🏢 [BUSINESS-MANAGER] Récupération abonnement pour user:", user.id);
+  let userId: string;
+  if (auth.isTempSession) {
+    // Pour les sessions temporaires, utiliser l'email comme identifiant
+    userId = auth.email;
+  } else {
+    userId = auth.user.id;
+  }
+  
+  console.log("🏢 [BUSINESS-MANAGER] Récupération abonnement pour user:", userId);
   const { data: subscription, error: subscriptionError } = await supabase
     .from('subscriptions')
     .select(`
       *,
       plan:subscription_plans(slug, max_businesses)
     `)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .single();
 
   if (subscriptionError) {
@@ -57,11 +73,11 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
   console.log("🏢 [BUSINESS-MANAGER] maxBusinesses calculé:", maxBusinesses);
 
   // Récupérer toutes les entreprises de l'utilisateur
-  console.log("🏢 [BUSINESS-MANAGER] Récupération entreprises pour user:", user.id);
+  console.log("🏢 [BUSINESS-MANAGER] Récupération entreprises pour user:", userId);
   const { data: businesses, error } = await supabase
     .from('businesses')
     .select('*')
-    .eq('owner_user_id', user.id)
+    .eq('owner_user_id', userId)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -115,10 +131,10 @@ export async function setActiveBusiness(businessId: string): Promise<void> {
 }
 
 export async function createBusiness(businessData: Partial<Business>): Promise<Business> {
-  const supabase = await createSupabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
+  // Utiliser le middleware d'authentification
+  const auth = await authenticateRequest();
   
-  if (!user) {
+  if (!auth.isAuthenticated) {
     throw new Error('User not authenticated');
   }
 
@@ -128,11 +144,21 @@ export async function createBusiness(businessData: Partial<Business>): Promise<B
     throw new Error(`Limite d'entreprises atteinte (${businessManager.businesses.length}/${businessManager.remainingSlots === null ? '∞' : businessManager.businesses.length + businessManager.remainingSlots})`);
   }
 
+  const supabase = await createSupabaseServer();
+  
+  // Déterminer l'ID utilisateur selon le type d'authentification
+  let userId: string;
+  if (auth.isTempSession) {
+    userId = auth.email;
+  } else {
+    userId = auth.user.id;
+  }
+
   const { data, error } = await supabase
     .from('businesses')
     .insert({
       ...businessData,
-      owner_user_id: user.id,
+      owner_user_id: userId,
       is_active: businessData.is_active ?? true,
       threshold_positive: businessData.threshold_positive ?? 4,
       created_at: new Date().toISOString(),
