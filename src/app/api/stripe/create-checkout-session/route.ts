@@ -5,42 +5,59 @@ import { authenticateRequest } from "@/lib/auth-middleware";
 
 export async function POST(req: Request) {
   try {
-    console.log("🔍 [DEBUG] Stripe checkout session request started");
+    // 1. Validation des variables d'environnement
+    if (!process.env.STRIPE_SECRET_KEY) {
+      console.error("❌ STRIPE_SECRET_KEY manquante");
+      return NextResponse.json({ 
+        error: "Configuration Stripe incomplète",
+        details: "STRIPE_SECRET_KEY non configurée"
+      }, { status: 500 });
+    }
+
+    // 2. Validation du body
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ 
+        error: "JSON invalide",
+        details: "Le corps de la requête doit être du JSON valide"
+      }, { status: 400 });
+    }
+
+    const { planId, billingCycle = 'monthly' } = body;
     
-    // Vérifier les variables d'environnement critiques
-    const stripeKeyPresent = !!process.env.STRIPE_SECRET_KEY;
-    const appUrlPresent = !!process.env.NEXT_PUBLIC_APP_URL;
-    console.log("🔍 [DEBUG] Env vars check:", {
-      stripeKeyPresent,
-      appUrlPresent,
-      stripeKeyLength: process.env.STRIPE_SECRET_KEY?.length || 0
-    });
-
-    if (!stripeKeyPresent) {
-      console.error("❌ [DEBUG] STRIPE_SECRET_KEY manquant");
-      return NextResponse.json({ error: "Configuration Stripe manquante" }, { status: 500 });
+    // 3. Validation des paramètres
+    if (!planId || typeof planId !== 'string') {
+      return NextResponse.json({ 
+        error: "Plan ID invalide",
+        details: "planId est requis et doit être une chaîne"
+      }, { status: 400 });
     }
 
-    const { planId, billingCycle = 'monthly' } = await req.json();
-    console.log("🔍 [DEBUG] Request body:", { planId, billingCycle });
-
-    if (!planId) {
-      console.error("❌ [DEBUG] Plan ID manquant");
-      return NextResponse.json({ error: "Plan ID requis" }, { status: 400 });
+    if (!['monthly', 'yearly'].includes(billingCycle)) {
+      return NextResponse.json({ 
+        error: "Billing cycle invalide",
+        details: "billingCycle doit être 'monthly' ou 'yearly'"
+      }, { status: 400 });
     }
 
-    // Vérifier l'authentification (Supabase ou temporaire)
-    console.log("🔍 [DEBUG] Checking authentication...");
+    // 4. Validation des plans supportés
+    if (!['pro', 'agency'].includes(planId)) {
+      return NextResponse.json({ 
+        error: "Plan non supporté",
+        details: "Les plans supportés sont: pro, agency"
+      }, { status: 400 });
+    }
+
+    // 5. Authentification
     const auth = await authenticateRequest();
-    console.log("🔍 [DEBUG] Auth result:", {
-      isAuthenticated: auth.isAuthenticated,
-      isTempSession: auth.isTempSession,
-      hasEmail: !!auth.email
-    });
     
     if (!auth.isAuthenticated) {
-      console.error("❌ [DEBUG] User not authenticated");
-      return NextResponse.json({ error: "Utilisateur non authentifié" }, { status: 401 });
+      return NextResponse.json({ 
+        error: "Non authentifié",
+        details: "Utilisateur non authentifié"
+      }, { status: 401 });
     }
 
     // Pour les sessions temporaires, créer un client Stripe avec l'email
@@ -79,38 +96,19 @@ export async function POST(req: Request) {
       customerId = subscription?.stripe_customer_id || null;
     }
     
-    // Déterminer le price ID Stripe
-    console.log("🔍 [DEBUG] Resolving price ID...");
-    console.log("🔍 [DEBUG] Available STRIPE_PLANS:", Object.keys(STRIPE_PLANS));
+    // 6. Résolution du Price ID
+    const priceIdKey = `${planId}_${billingCycle}` as keyof typeof STRIPE_PLANS;
+    const priceId = STRIPE_PLANS[priceIdKey];
     
-    let priceId: string;
-    switch (planId) {
-      case 'pro':
-        priceId = billingCycle === 'yearly' ? STRIPE_PLANS.pro_yearly : STRIPE_PLANS.pro_monthly;
-        break;
-      case 'agency':
-        priceId = billingCycle === 'yearly' ? STRIPE_PLANS.agency_yearly : STRIPE_PLANS.agency_monthly;
-        break;
-      default:
-        console.error("❌ [DEBUG] Invalid plan:", planId);
-        return NextResponse.json({ error: "Plan invalide" }, { status: 400 });
-    }
-    
-    console.log("🔍 [DEBUG] Resolved price ID:", {
-      planId,
-      billingCycle,
-      priceId,
-      priceIdLength: priceId?.length || 0
-    });
-    
-    if (!priceId) {
-      console.error("❌ [DEBUG] Price ID is undefined or empty");
-      return NextResponse.json({ error: "Price ID non trouvé" }, { status: 500 });
+    if (!priceId || !priceId.startsWith('price_')) {
+      return NextResponse.json({ 
+        error: "Price ID invalide",
+        details: `Price ID pour ${planId} ${billingCycle} non trouvé ou invalide. Attendu: price_..., reçu: ${priceId}`
+      }, { status: 500 });
     }
 
-    // Créer le client Stripe si nécessaire
+    // 7. Créer le client Stripe si nécessaire
     if (!customerId && user) {
-      console.log("🔍 [DEBUG] Creating new Stripe customer...");
       try {
         const customer = await stripe.customers.create({
           email: user.email!,
@@ -121,51 +119,41 @@ export async function POST(req: Request) {
           }
         });
         customerId = customer.id;
-        console.log("✅ [DEBUG] Customer created:", customerId);
 
         // Sauvegarder le customer ID en base pour les sessions Supabase
         if (!auth.isTempSession) {
-          console.log("🔍 [DEBUG] Saving customer ID to database...");
           const supabase = await createSupabaseServer();
           await supabase
             .from('subscriptions')
             .update({ stripe_customer_id: customerId })
             .eq('user_id', user.id);
-          console.log("✅ [DEBUG] Customer ID saved to database");
         }
       } catch (customerError) {
-        console.error("❌ [DEBUG] Error creating customer:", customerError);
-        throw customerError;
+        console.error("❌ Erreur création client Stripe:", customerError);
+        return NextResponse.json({ 
+          error: "Erreur création client Stripe",
+          details: customerError instanceof Error ? customerError.message : 'Unknown error'
+        }, { status: 500 });
       }
     }
 
-    console.log("� [DEBUG] Preparing to create Stripe session:", {
-      customerId,
-      priceId,
-      planId,
-      billingCycle,
-      isTempSession: auth.isTempSession,
-      customerIdPresent: !!customerId
-    });
-
     if (!customerId) {
-      console.error("❌ [DEBUG] No customer ID available");
-      return NextResponse.json({ error: "Customer ID manquant" }, { status: 500 });
+      return NextResponse.json({ 
+        error: "Customer ID manquant",
+        details: "Impossible de créer ou récupérer le client Stripe"
+      }, { status: 500 });
     }
 
-    console.log("🔍 [DEBUG] Creating Stripe checkout session...");
-    let session;
+    // 8. Créer la session Checkout
     try {
-      session = await stripe.checkout.sessions.create({
-        customer: customerId!,
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
         payment_method_types: ['card'],
         mode: 'subscription',
-        line_items: [
-          {
-            price: priceId,
-            quantity: 1,
-          },
-        ],
+        line_items: [{
+          price: priceId,
+          quantity: 1,
+        }],
         success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://trustreview-eight.vercel.app'}/app/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://trustreview-eight.vercel.app'}/app/billing?canceled=true`,
         metadata: {
@@ -183,35 +171,23 @@ export async function POST(req: Request) {
           },
         },
       });
-      console.log("✅ [DEBUG] Stripe session created successfully:", session.id);
-    } catch (sessionError) {
-      console.error("❌ [DEBUG] Error creating Stripe session:", sessionError);
-      console.error("❌ [DEBUG] Session error details:", {
-        message: sessionError instanceof Error ? sessionError.message : 'Unknown error',
-        stack: sessionError instanceof Error ? sessionError.stack : undefined,
-        type: sessionError?.constructor?.name
-      });
-      throw sessionError;
+
+      return NextResponse.json({ sessionId: session.id });
+
+    } catch (stripeError) {
+      console.error("❌ Erreur création session Stripe:", stripeError);
+      return NextResponse.json({ 
+        error: "Erreur création session Stripe",
+        details: stripeError instanceof Error ? stripeError.message : 'Unknown error'
+      }, { status: 500 });
     }
 
-    return NextResponse.json({ sessionId: session.id });
-
   } catch (error) {
-    console.error("❌ [DEBUG] COMPLETE ERROR in checkout session:", {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      type: error?.constructor?.name,
-      raw: error
-    });
-    
-    return NextResponse.json(
-      { 
-        error: "Erreur lors de la création de la session de paiement",
-        debug: process.env.NODE_ENV === 'development' ? {
-          message: error instanceof Error ? error.message : 'Unknown error'
-        } : undefined
-      },
-      { status: 500 }
-    );
+    console.error("❌ Erreur inattendue:", error);
+    return NextResponse.json({ 
+      error: "Erreur serveur inattendue",
+      details: process.env.NODE_ENV === 'development' ? 
+        (error instanceof Error ? error.message : 'Unknown error') : undefined
+    }, { status: 500 });
   }
 }

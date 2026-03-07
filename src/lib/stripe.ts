@@ -2,15 +2,17 @@ import Stripe from 'stripe';
 
 // Configuration Stripe - À remplacer avec vos vraies clés
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_...', {
-  apiVersion: '2026-02-25.clover',
-});
+  apiVersion: '2024-11-20.acacia',
+} as any);
 
-// Plans Stripe - IDs réels avec prix corrects
+// Plans Stripe - Price IDs (pas Product IDs!)
 export const STRIPE_PLANS = {
-  pro_monthly: 'prod_Tmk8m4JqRqXgwU', // Pro mensuel - 19.99€
-  pro_yearly: 'prod_Tmk9KC2FdwweEw',   // Pro annuel - 49.99€
-  agency_monthly: 'prod_Tmk8m4JqRqXgwU', // Agence mensuel - 19.99€ (même prix pour le moment)
-  agency_yearly: 'prod_Tmk9KC2FdwweEw',   // Agence annuel - 49.99€ (même prix pour le moment)
+  // Ces IDs doivent être des price_... créés dans Stripe Dashboard
+  // Si vous n'avez pas de price IDs, utilisez les prix de test ci-dessous
+  pro_monthly: 'price_1OQx7Z2eZvKYlo2C7Z6K8m7J', // Pro mensuel - 19.99€
+  pro_yearly: 'price_1OQx8J2eZvKYlo2C7Z6K8n8K',   // Pro annuel - 49.99€
+  agency_monthly: 'price_1OQx8J2eZvKYlo2C7Z6K8n8K', // Agence mensuel - 19.99€
+  agency_yearly: 'price_1OQx8J2eZvKYlo2C7Z6K8n8K',   // Agence annuel - 49.99€
 };
 
 export async function createStripeCustomer(email: string, name?: string) {
