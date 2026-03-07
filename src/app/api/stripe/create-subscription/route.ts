@@ -46,15 +46,15 @@ export async function POST(req: Request) {
     
     if (!priceId) {
       return NextResponse.json({ 
-        error: "Price ID non configuré",
-        details: `Price ID pour ${planId} ${billingCycle} non trouvé. Variable d'environnement manquante: STRIPE_PRICE_${planId.toUpperCase()}_${billingCycle.toUpperCase()}`
+        error: "Plan non configuré",
+        details: `Price ID pour ${planId} ${billingCycle} non trouvé dans STRIPE_PLANS`
       }, { status: 500 });
     }
     
     if (!priceId.startsWith('price_')) {
       return NextResponse.json({ 
         error: "Price ID invalide",
-        details: `Price ID pour ${planId} ${billingCycle} invalide. Attendu: price_..., reçu: ${priceId}`
+        details: `Price ID pour ${planId} ${billingCycle} invalide. Attendu: price_..., reçu: ${priceId}. Mettez à jour src/lib/stripe.ts avec vos vrais Price IDs`
       }, { status: 500 });
     }
 
