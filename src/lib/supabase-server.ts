@@ -3,11 +3,22 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 export async function createSupabaseServer() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl) {
+    throw new Error("❌ Configuration Supabase manquante: NEXT_PUBLIC_SUPABASE_URL n'est pas défini. Ajoutez cette variable d'environnement dans votre configuration.");
+  }
+
+  if (!supabaseAnonKey) {
+    throw new Error("❌ Configuration Supabase manquante: NEXT_PUBLIC_SUPABASE_ANON_KEY n'est pas défini. Ajoutez cette variable d'environnement dans votre configuration.");
+  }
+
   const cookieStore = await cookies();
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -28,15 +39,20 @@ export async function createSupabaseServer() {
 }
 
 export async function createSupabaseServiceClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  
+
+  if (!supabaseUrl) {
+    throw new Error("❌ Configuration Supabase manquante: NEXT_PUBLIC_SUPABASE_URL n'est pas défini. Ajoutez cette variable d'environnement dans votre configuration.");
+  }
+
   if (!serviceRoleKey) {
-    console.warn("⚠️ SUPABASE_SERVICE_ROLE_KEY non défini, utilisation du client standard");
+    console.warn("⚠️ SUPABASE_SERVICE_ROLE_KEY non défini, utilisation du client standard pour les sessions temporaires");
     return createSupabaseServer();
   }
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    supabaseUrl,
     serviceRoleKey,
     {
       cookies: {

@@ -205,7 +205,7 @@ export default function BillingPage() {
         <SubscriptionSwitcher onClose={() => setShowAdminPanel(false)} />
       )}
 
-      {/* Trial Active Section */}
+      {/* Trial Active Section - Visible SEULEMENT si trial est actif */}
       {subscriptionInfo.isTrialActive && subscriptionInfo.plan && (
         <Card className="card-enhanced border-blue-200 bg-blue-50">
           <CardHeader>
@@ -251,8 +251,8 @@ export default function BillingPage() {
         </Card>
       )}
 
-      {/* Onboarding Section for New Users */}
-      {(!subscriptionInfo.plan || subscriptionInfo.plan.slug === 'starter') && (
+      {/* Start Trial Section - Visible SEULEMENT si éligible et PAS de trial actif */}
+      {subscriptionInfo.isTrialAvailable && !subscriptionInfo.isTrialActive && (
         <Card className="card-enhanced border-green-200 bg-green-50">
           <CardHeader>
             <CardTitle>
