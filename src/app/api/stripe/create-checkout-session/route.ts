@@ -90,6 +90,14 @@ export async function POST(req: Request) {
     }
 
     // Créer la session Checkout
+    console.log("🔧 Creating Stripe session:", {
+      customerId,
+      priceId,
+      planId,
+      billingCycle,
+      isTempSession: auth.isTempSession
+    });
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId!,
       payment_method_types: ['card'],
@@ -108,7 +116,7 @@ export async function POST(req: Request) {
         billing_cycle: billingCycle,
         is_temp_session: auth.isTempSession ? 'true' : 'false'
       },
-      subscription_data: {
+      subscription_data: auth.isTempSession ? undefined : {
         metadata: {
           user_id: user?.id || auth.email,
           plan_id: planId,
@@ -117,6 +125,8 @@ export async function POST(req: Request) {
         },
       },
     });
+
+    console.log("✅ Stripe session created:", session.id);
 
     return NextResponse.json({ sessionId: session.id });
 

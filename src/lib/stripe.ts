@@ -5,12 +5,12 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_...',
   apiVersion: '2026-02-25.clover',
 });
 
-// Plans Stripe - IDs réels
+// Plans Stripe - IDs réels avec prix corrects
 export const STRIPE_PLANS = {
-  pro_monthly: 'prod_U5llyx37kYtWbK', // Pro mensuel
-  pro_yearly: 'prod_U5lmxddH8BdIfd',   // Pro annuel
-  agency_monthly: 'prod_U5lnBQGk10yELL', // Agence mensuel
-  agency_yearly: 'prod_U5loCUvGjrvfu5',   // Agence annuel
+  pro_monthly: 'prod_Tmk8m4JqRqXgwU', // Pro mensuel - 19.99€
+  pro_yearly: 'prod_Tmk9KC2FdwweEw',   // Pro annuel - 49.99€
+  agency_monthly: 'prod_Tmk8m4JqRqXgwU', // Agence mensuel - 19.99€ (même prix pour le moment)
+  agency_yearly: 'prod_Tmk9KC2FdwweEw',   // Agence annuel - 49.99€ (même prix pour le moment)
 };
 
 export async function createStripeCustomer(email: string, name?: string) {
