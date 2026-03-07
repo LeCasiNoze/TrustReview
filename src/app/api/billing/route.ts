@@ -1,8 +1,49 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase-server";
+import { authenticateRequest } from "@/lib/auth-middleware";
 
 export async function GET() {
   try {
+    const auth = await authenticateRequest();
+    
+    if (!auth.isAuthenticated) {
+      return NextResponse.json({
+        isAuthenticated: false,
+        hasSubscriptionActive: false,
+        isTrialActive: false,
+        isTrialAvailable: true,
+        subscriptionStatus: 'none',
+        needsOnboarding: false
+      });
+    }
+
+    // Session temporaire = créer un trial factice
+    if (auth.isTempSession) {
+      const trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      return NextResponse.json({
+        isAuthenticated: true,
+        hasSubscriptionActive: true,
+        isTrialActive: true,
+        isTrialAvailable: false,
+        subscriptionStatus: 'trialing',
+        needsOnboarding: false,
+        subscription: {
+          id: 'temp-trial',
+          status: 'trialing',
+          trial_end: trialEnd.toISOString(),
+          created_at: new Date().toISOString()
+        },
+        plan: {
+          id: 'starter',
+          name: 'Essai gratuit',
+          slug: 'starter',
+          max_businesses: 1,
+          max_qr_codes: 5
+        }
+      });
+    }
+
+    // Authentification Supabase normale
     const supabase = await createSupabaseServer();
     const { data: { user } } = await supabase.auth.getUser();
     
@@ -16,7 +57,7 @@ export async function GET() {
         needsOnboarding: false
       });
     }
-
+    
     // Récupérer l'abonnement
     const { data: subscription } = await supabase
       .from('subscriptions')

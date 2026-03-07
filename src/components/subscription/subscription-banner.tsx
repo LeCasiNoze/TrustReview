@@ -33,24 +33,32 @@ export default function SubscriptionBanner({ className = "" }: SubscriptionBanne
   }
 
   const getBannerVariant = () => {
-    if (subscriptionStatus.isExpired) {
+    // Vrai abonnement expiré = rouge
+    if (subscriptionStatus.isExpired && subscriptionStatus.message.includes("expir")) {
       return "expired";
     }
+    // Trial actif = ambre (informatif)
     if (subscriptionStatus.isTrial) {
       return "trial";
     }
-    return "warning";
+    // Problème d'accès mais pas "expiré" = gris
+    if (!subscriptionStatus.canAccess) {
+      return "warning";
+    }
+    return null;
   };
 
   const variant = getBannerVariant();
+  
+  if (!variant) return null;
 
-  const bannerStyles = {
+  const bannerStyles: Record<string, string> = {
     expired: "bg-red-50 border-red-200 text-red-800",
     trial: "bg-amber-50 border-amber-200 text-amber-800", 
     warning: "bg-slate-50 border-slate-200 text-slate-800"
   };
 
-  const buttonStyles = {
+  const buttonStyles: Record<string, string> = {
     expired: "bg-red-600 hover:bg-red-700 text-white",
     trial: "bg-amber-600 hover:bg-amber-700 text-white",
     warning: "bg-slate-600 hover:bg-slate-700 text-white"

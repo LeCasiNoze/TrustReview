@@ -1,5 +1,3 @@
-import { getUserSubscriptionInfo } from './subscription';
-
 export interface SubscriptionGuardResult {
   canAccess: boolean;
   isExpired: boolean;
@@ -11,44 +9,53 @@ export interface SubscriptionGuardResult {
 
 export async function checkSubscriptionAccess(): Promise<SubscriptionGuardResult> {
   try {
-    const subscriptionInfo = await getUserSubscriptionInfo();
+    // Utiliser l'API billing pour avoir les infos à jour
+    const response = await fetch('/api/billing', { cache: 'no-store' });
+    const billingData = await response.json();
     
-    if (!subscriptionInfo || !subscriptionInfo.subscription || !subscriptionInfo.plan) {
+    if (!billingData.isAuthenticated) {
       return {
         canAccess: false,
-        isExpired: true,
+        isExpired: false, // Pas "expiré", juste "non connecté"
         isTrial: false,
-        message: "Aucun abonnement trouvé. Veuillez vous inscrire.",
+        message: "Veuillez vous connecter",
         planName: "Aucun",
         features: {}
       };
     }
 
-    const { subscription, plan } = subscriptionInfo;
-    const isExpired = subscription.status === 'canceled' || subscription.status === 'past_due' || subscription.status === 'unpaid';
-    const isTrial = subscription.status === 'trialing';
-    
-    let canAccess = true;
-    let message = "";
-
-    // Vérifier le statut de l'abonnement
-    if (isExpired) {
-      canAccess = false;
-      message = "Votre abonnement a expiré. Renouvelez-le pour continuer à utiliser TrustReview.";
-    } else if (isTrial && subscriptionInfo.trialDaysLeft !== null && subscriptionInfo.trialDaysLeft <= 0) {
-      canAccess = false;
-      message = "Votre période d'essai est terminée. Choisissez un abonnement pour continuer.";
-    } else if (isTrial && subscriptionInfo.trialDaysLeft !== null && subscriptionInfo.trialDaysLeft <= 2) {
-      message = `Votre essai se termine dans ${subscriptionInfo.trialDaysLeft} jour${subscriptionInfo.trialDaysLeft > 1 ? 's' : ''}.`;
+    // Si trial actif, accès autorisé
+    if (billingData.isTrialActive) {
+      return {
+        canAccess: true,
+        isExpired: false,
+        isTrial: true,
+        message: "Essai gratuit actif",
+        planName: billingData.plan?.name || "Essai",
+        features: {}
+      };
     }
 
+    // Si abonnement actif, accès autorisé
+    if (billingData.hasSubscriptionActive) {
+      return {
+        canAccess: true,
+        isExpired: false,
+        isTrial: false,
+        message: "Abonnement actif",
+        planName: billingData.plan?.name || "Actif",
+        features: {}
+      };
+    }
+
+    // Aucun accès valide
     return {
-      canAccess,
-      isExpired,
-      isTrial,
-      message,
-      planName: plan.name,
-      features: plan.features
+      canAccess: false,
+      isExpired: billingData.subscriptionStatus === 'canceled' || billingData.subscriptionStatus === 'past_due',
+      isTrial: false,
+      message: billingData.subscriptionStatus === 'none' ? "Choisissez un abonnement" : "Votre abonnement nécessite une action",
+      planName: billingData.plan?.name || "Aucun",
+      features: {}
     };
 
   } catch (error) {
