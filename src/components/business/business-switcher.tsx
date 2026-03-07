@@ -55,7 +55,7 @@ export default function BusinessSwitcher() {
     return <div className="w-48 h-8 bg-slate-200 rounded animate-pulse"></div>;
   }
 
-  if (!businessManager || businessManager.businesses.length <= 1) {
+  if (!businessManager || !Array.isArray(businessManager.businesses) || businessManager.businesses.length <= 1) {
     return null;
   }
 
@@ -102,10 +102,10 @@ export default function BusinessSwitcher() {
         <div className="absolute top-full left-0 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg z-50">
           <div className="p-2">
             <div className="text-xs font-medium text-slate-500 px-2 py-1">
-              Vos entreprises ({businesses.length}/{remainingSlots === null ? '∞' : businesses.length + remainingSlots})
+              Vos entreprises ({businesses?.length || 0}/{remainingSlots === null ? '∞' : (businesses?.length || 0) + (remainingSlots || 0)})
             </div>
             
-            {businesses.map((business: Business) => (
+            {businesses?.map((business: Business) => (
               <button
                 key={business.id}
                 onClick={() => handleBusinessChange(business.id)}

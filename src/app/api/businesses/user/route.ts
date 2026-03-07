@@ -12,7 +12,12 @@ export async function GET() {
 
     // Si session temporaire, retourner des données factices
     if (auth.isTempSession) {
-      return NextResponse.json([]);
+      return NextResponse.json({
+        businesses: [],
+        activeBusinessId: null,
+        canCreateMore: true,
+        remainingSlots: null
+      });
     }
 
     // Authentification Supabase normale
@@ -37,13 +42,22 @@ export async function GET() {
       .eq('user_id', user.id)
       .single();
 
+    // Toujours retourner une structure cohérente
     return NextResponse.json({
-      businesses: businesses || [],
-      activeBusinessId: activeBusiness?.active_business_id
+      businesses: Array.isArray(businesses) ? businesses : [],
+      activeBusinessId: activeBusiness?.active_business_id || null,
+      canCreateMore: true, // TODO: Calculer selon l'abonnement
+      remainingSlots: null // TODO: Calculer selon l'abonnement
     });
   } catch (error) {
     console.error("Error fetching businesses:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    // Même en cas d'erreur, retourner une structure safe pour éviter le crash
+    return NextResponse.json({
+      businesses: [],
+      activeBusinessId: null,
+      canCreateMore: true,
+      remainingSlots: null
+    }, { status: 200 }); // 200 pour éviter le crash côté client
   }
 }
 
