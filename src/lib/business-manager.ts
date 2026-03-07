@@ -57,16 +57,8 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
       }
     };
     subscriptionError = null;
-    // Générer un UUID déterministe basé sur l'email pour les sessions temporaires
-    const emailHash = Buffer.from(auth.email).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
-    const uuid = [
-      emailHash.substring(0, 8),
-      emailHash.substring(8, 12),
-      emailHash.substring(12, 16),
-      emailHash.substring(16, 20),
-      emailHash.substring(20, 32)
-    ].join('-');
-    userId = uuid;
+    // Générer un vrai UUID aléatoire pour les sessions temporaires
+    userId = randomUUID();
   } else {
     userId = auth.user.id;
     console.log("🏢 [BUSINESS-MANAGER] Récupération abonnement pour user:", userId);
@@ -218,16 +210,8 @@ export async function createBusiness(businessData: Partial<Business>): Promise<B
   // Déterminer l'ID utilisateur selon le type d'authentification
   let userId: string;
   if (auth.isTempSession) {
-    // Générer le même UUID déterministe basé sur l'email pour les sessions temporaires
-    const emailHash = Buffer.from(auth.email).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
-    const uuid = [
-      emailHash.substring(0, 8),
-      emailHash.substring(8, 12),
-      emailHash.substring(12, 16),
-      emailHash.substring(16, 20),
-      emailHash.substring(20, 32)
-    ].join('-');
-    userId = uuid;
+    // Générer un vrai UUID aléatoire pour les sessions temporaires
+    userId = randomUUID();
   } else {
     userId = auth.user.id; // Pour les sessions Supabase, stocker l'UUID
   }
