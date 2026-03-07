@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { loadStripe } from "@stripe/stripe-js";
-import type { Stripe } from "@stripe/stripe-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -156,20 +154,13 @@ export default function BillingPage() {
         throw new Error(data.error || "Failed to create checkout session");
       }
       
-      // Rediriger vers Stripe Checkout
-      const stripe = await loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
-      if (stripe) {
-        const { error } = await (stripe as any).redirectToCheckout({
-          sessionId: data.sessionId
-        });
-        
-        if (error) {
-          console.error('Stripe checkout error:', error);
-          alert('Erreur lors du paiement. Veuillez réessayer.');
-        }
+      // Rediriger vers Stripe Checkout via session.url
+      if (data.url) {
+        console.log("🔀 Redirection vers Stripe Checkout:", data.url);
+        window.location.assign(data.url);
       } else {
-        console.error('Failed to load Stripe');
-        alert('Erreur lors du chargement du système de paiement.');
+        console.error('❌ Session URL manquante dans la réponse');
+        alert('Erreur: URL de paiement manquante. Veuillez réessayer.');
       }
     } catch (error) {
       console.error('Error changing plan:', error);

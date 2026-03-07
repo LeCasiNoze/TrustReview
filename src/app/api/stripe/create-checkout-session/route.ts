@@ -201,7 +201,20 @@ export async function POST(req: Request) {
       });
 
       console.log("✅ [STRIPE DEBUG] Session créée:", session.id);
-      return NextResponse.json({ sessionId: session.id });
+      
+      // Vérifier que session.url existe
+      if (!session.url) {
+        console.error("❌ [STRIPE DEBUG] Session URL manquante");
+        return NextResponse.json({ 
+          error: "Session URL manquante",
+          details: "Stripe n'a pas retourné d'URL pour cette session"
+        }, { status: 500 });
+      }
+      
+      return NextResponse.json({ 
+        sessionId: session.id,
+        url: session.url 
+      });
 
     } catch (stripeError) {
       console.error("❌ [STRIPE DEBUG] Erreur création session Stripe:", {
