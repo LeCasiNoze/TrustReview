@@ -3,20 +3,11 @@ import { createSupabaseServer } from "@/lib/supabase-server";
 
 export async function POST(req: Request) {
   try {
-    // SÉCURITÉ: Uniquement en développement ou pour l'admin
-    const isDev = process.env.NODE_ENV !== 'production';
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@trustreview.test';
-    
     const supabase = await createSupabaseServer();
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-    }
-
-    // Vérifier si c'est l'admin ou si on est en dev
-    if (!isDev && user.email !== adminEmail) {
-      return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
     }
 
     const { planId, status, billingCycle } = await req.json();

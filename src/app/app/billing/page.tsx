@@ -189,17 +189,15 @@ export default function BillingPage() {
           <h1 className="text-2xl font-bold">Facturation</h1>
           <p className="text-muted-foreground">Gérez votre abonnement et vos factures</p>
         </div>
-        {/* Bouton admin caché - uniquement en dev */}
-        {(process.env.NODE_ENV !== 'production') && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowAdminPanel(true)}
-            className="text-xs"
-          >
-            🧪 Admin
-          </Button>
-        )}
+        {/* Bouton admin - visible pour tests */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowAdminPanel(true)}
+          className="text-xs"
+        >
+          🧪 Admin
+        </Button>
       </div>
 
       {/* Panneau admin de test d'abonnement */}
