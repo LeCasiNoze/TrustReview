@@ -39,7 +39,7 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
     throw new Error('User not authenticated');
   }
 
-  // Utiliser service role pour les sessions temporaires afin de contourner RLS
+  // Utiliser le client approprié selon le type d'authentification
   const supabase = auth.isTempSession ? await createSupabaseServiceClient() : await createSupabaseServer();
 
   // Récupérer les infos d'abonnement pour vérifier les limites
@@ -48,7 +48,7 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
   let subscription, subscriptionError;
   
   if (auth.isTempSession) {
-    // Pour les sessions temporaires, créer un abonnement par défaut et générer un vrai UUID
+    // Pour les sessions temporaires, créer un abonnement par défaut et un UUID déterministe
     console.log("🏢 [BUSINESS-MANAGER] Session temporaire détectée, utilisation abonnement starter par défaut");
     subscription = {
       plan: {
@@ -57,8 +57,16 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
       }
     };
     subscriptionError = null;
-    // Générer un vrai UUID aléatoire pour les sessions temporaires
-    userId = randomUUID();
+    // Générer un UUID déterministe basé sur l'email pour les sessions temporaires
+    const emailHash = Buffer.from(auth.email).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
+    const uuid = [
+      emailHash.substring(0, 8),
+      emailHash.substring(8, 12),
+      emailHash.substring(12, 16),
+      emailHash.substring(16, 20),
+      emailHash.substring(20, 32)
+    ].join('-');
+    userId = uuid;
   } else {
     userId = auth.user.id;
     console.log("🏢 [BUSINESS-MANAGER] Récupération abonnement pour user:", userId);
@@ -173,14 +181,22 @@ export async function createBusiness(businessData: Partial<Business>): Promise<B
     throw new Error(`Limite d'entreprises atteinte (${businessManager.businesses.length}/${businessManager.remainingSlots === null ? '∞' : businessManager.businesses.length + businessManager.remainingSlots})`);
   }
 
-  // Utiliser service role pour les sessions temporaires afin de contourner RLS
+  // Utiliser le client approprié selon le type d'authentification
   const supabase = auth.isTempSession ? await createSupabaseServiceClient() : await createSupabaseServer();
   
   // Déterminer l'ID utilisateur selon le type d'authentification
   let userId: string;
   if (auth.isTempSession) {
-    // Générer un vrai UUID aléatoire pour les sessions temporaires
-    userId = randomUUID();
+    // Générer le même UUID déterministe basé sur l'email pour les sessions temporaires
+    const emailHash = Buffer.from(auth.email).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
+    const uuid = [
+      emailHash.substring(0, 8),
+      emailHash.substring(8, 12),
+      emailHash.substring(12, 16),
+      emailHash.substring(16, 20),
+      emailHash.substring(20, 32)
+    ].join('-');
+    userId = uuid;
   } else {
     userId = auth.user.id; // Pour les sessions Supabase, stocker l'UUID
   }
