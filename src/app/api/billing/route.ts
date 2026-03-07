@@ -94,7 +94,8 @@ export async function GET() {
       subscriptionStatus: subscription?.status || 'none',
       needsOnboarding,
       subscription,
-      plan: subscription?.plan || null
+      plan: subscription?.plan || null,
+      userEmail: user.email // Ajout pour debug admin
     });
 
   } catch (error) {

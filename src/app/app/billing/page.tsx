@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { UserSubscriptionInfo, SubscriptionPlan } from "@/lib/types/subscription";
+import SubscriptionSwitcher from "@/components/admin/SubscriptionSwitcher";
 
 // Plans statiques pour l'affichage (prix en centimes)
 const STATIC_PLANS = [
@@ -64,6 +65,7 @@ export default function BillingPage() {
   const [subscriptionInfo, setSubscriptionInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -187,7 +189,23 @@ export default function BillingPage() {
           <h1 className="text-2xl font-bold">Facturation</h1>
           <p className="text-muted-foreground">Gérez votre abonnement et vos factures</p>
         </div>
+        {/* Bouton admin caché - uniquement en dev */}
+        {process.env.NODE_ENV === 'development' && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAdminPanel(true)}
+            className="text-xs"
+          >
+            🧪 Admin
+          </Button>
+        )}
       </div>
+
+      {/* Panneau admin de test d'abonnement */}
+      {showAdminPanel && (
+        <SubscriptionSwitcher onClose={() => setShowAdminPanel(false)} />
+      )}
 
       {/* Trial Active Section */}
       {subscriptionInfo.isTrialActive && subscriptionInfo.plan && (
