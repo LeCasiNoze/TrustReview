@@ -1,16 +1,40 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase-server";
+import { authenticateRequest } from "@/lib/auth-middleware";
 
 export async function GET() {
   try {
-    const supabase = await createSupabaseServer();
+    // Vérifier l'authentification (Supabase ou temporaire)
+    const auth = await authenticateRequest();
     
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !user) {
-      console.error("Business API - User auth error:", userError);
+    if (!auth.isAuthenticated) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    console.log("Business API - Authenticated:", { email: auth.email, isTemp: auth.isTempSession });
+
+    // Si session temporaire, retourner des données factices
+    if (auth.isTempSession) {
+      return NextResponse.json({
+        id: "temp-business-id",
+        name: "Votre entreprise",
+        slug: "temp-business",
+        description: "Configurez votre entreprise",
+        user_id: "temp-user",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        qr_background_color: "#ffffff",
+        qr_foreground_color: "#000000",
+        is_temp: true
+      });
+    }
+
+    // Authentification Supabase normale
+    const supabase = await createSupabaseServer();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 401 });
     }
 
     console.log("Business API - User authenticated:", user.id);

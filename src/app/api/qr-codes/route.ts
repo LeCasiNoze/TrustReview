@@ -2,9 +2,27 @@ import { createSupabaseServer } from '@/lib/supabase-server'
 import { requireUserServer } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { NextRequest, NextResponse } from 'next/server'
+import { authenticateRequest } from "@/lib/auth-middleware";
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await authenticateRequest();
+    
+    if (!auth.isAuthenticated) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Si session temporaire, retourner des données factices
+    if (auth.isTempSession) {
+      return NextResponse.json({
+        qrCodes: [],
+        total: 0,
+        active: 0,
+        inactive: 0
+      });
+    }
+
+    // Authentification Supabase normale
     const user = await requireUserServer()
     const supabase = await createSupabaseServer()
     
