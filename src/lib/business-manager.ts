@@ -57,8 +57,16 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
       }
     };
     subscriptionError = null;
-    // Pour les sessions temporaires, utiliser l'email comme identifiant (compatible avec RLS)
-    userId = auth.email;
+    // Pour les sessions temporaires, générer un UUID déterministe basé sur l'email
+    const emailHash = require('crypto').createHash('sha256').update(auth.email).digest('hex');
+    const deterministicUuid = [
+      emailHash.substring(0, 8),
+      emailHash.substring(8, 12),
+      emailHash.substring(12, 16),
+      emailHash.substring(16, 20),
+      emailHash.substring(20, 32)
+    ].join('-');
+    userId = deterministicUuid;
   } else {
     userId = auth.user.id;
     console.log("🏢 [BUSINESS-MANAGER] Récupération abonnement pour user:", userId);
@@ -210,8 +218,16 @@ export async function createBusiness(businessData: Partial<Business>): Promise<B
   // Déterminer l'ID utilisateur selon le type d'authentification
   let userId: string;
   if (auth.isTempSession) {
-    // Pour les sessions temporaires, utiliser l'email comme identifiant (cohérent avec getUserBusinesses)
-    userId = auth.email;
+    // Pour les sessions temporaires, générer le même UUID déterministe basé sur l'email
+    const emailHash = require('crypto').createHash('sha256').update(auth.email).digest('hex');
+    const deterministicUuid = [
+      emailHash.substring(0, 8),
+      emailHash.substring(8, 12),
+      emailHash.substring(12, 16),
+      emailHash.substring(16, 20),
+      emailHash.substring(20, 32)
+    ].join('-');
+    userId = deterministicUuid;
   } else {
     userId = auth.user.id; // Pour les sessions Supabase, stocker l'UUID
   }

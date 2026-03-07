@@ -10,13 +10,22 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Si session temporaire, récupérer les entreprises avec l'email
+    // Si session temporaire, récupérer les entreprises avec l'UUID déterministe
     if (auth.isTempSession) {
+      const emailHash = require('crypto').createHash('sha256').update(auth.email).digest('hex');
+      const deterministicUuid = [
+        emailHash.substring(0, 8),
+        emailHash.substring(8, 12),
+        emailHash.substring(12, 16),
+        emailHash.substring(16, 20),
+        emailHash.substring(20, 32)
+      ].join('-');
+      
       const supabase = await createSupabaseServer();
       const { data: businesses } = await supabase
         .from('businesses')
         .select('*')
-        .eq('owner_user_id', auth.email)
+        .eq('owner_user_id', deterministicUuid)
         .order('created_at', { ascending: false });
       
       return NextResponse.json({
