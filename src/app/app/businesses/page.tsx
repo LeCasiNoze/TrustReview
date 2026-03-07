@@ -132,14 +132,14 @@ export default function BusinessesPage() {
       </div>
 
       {/* Subscription Banner */}
-      {!subscriptionInfo?.canAccess && (
+      {subscriptionInfo && !subscriptionInfo.canAccess && (
         <Card className="border-red-200 bg-red-50">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-semibold text-red-800">Abonnement requis</h3>
                 <p className="text-sm text-red-600">
-                  {subscriptionInfo.isExpired 
+                  {subscriptionInfo.subscriptionStatus === 'canceled' || subscriptionInfo.subscriptionStatus === 'past_due'
                     ? "Votre abonnement a expiré. Renouvelez-le pour gérer plusieurs entreprises."
                     : "Passez à un plan supérieur pour gérer plusieurs entreprises."
                   }

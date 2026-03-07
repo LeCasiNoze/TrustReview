@@ -137,7 +137,7 @@ export default function QRPage() {
   };
 
   const applyColorPreset = (preset: QRColorPreset) => {
-    if (preset.is_premium && !subscriptionInfo?.hasFeature('qr_customization')) {
+    if (preset.is_premium && (!subscriptionInfo?.plan || subscriptionInfo.plan.slug === 'starter')) {
       // Afficher un message d'upgrade
       alert('Cette couleur est réservée aux abonnés Pro et Agence !');
       return;
@@ -298,7 +298,7 @@ export default function QRPage() {
     const subscriptionResponse = await fetch('/api/subscription');
     const subscriptionData = await subscriptionResponse.json();
     
-    if (!subscriptionData.canAccess || subscriptionData.isExpired) {
+    if (!subscriptionData.canAccess || subscriptionData.subscriptionStatus === 'canceled' || subscriptionData.subscriptionStatus === 'past_due') {
       alert('Votre abonnement a expiré. Renouvelez-le pour continuer à créer des QR codes.');
       window.location.href = '/app/billing';
       return;
@@ -582,7 +582,7 @@ export default function QRPage() {
           <p className="page-desc">
             {qrCodes.length}/{qrLimit === null ? '∞' : qrLimit} codes · 
             <span className="font-medium" style={{ color:"hsl(226 71% 55%)" }}> {subscriptionInfo?.plan?.name || 'Chargement...'}</span> · 
-            {subscriptionInfo?.hasFeature('qr_customization') ? 'Personnalisation complète' : 'Personnalisation de base'}
+            {subscriptionInfo?.plan?.slug !== 'starter' ? 'Personnalisation complète' : 'Personnalisation de base'}
           </p>
         </div>
         {canCreate && (
@@ -632,9 +632,9 @@ export default function QRPage() {
                           <button
                             key={preset.id}
                             onClick={() => applyColorPreset(preset)}
-                            disabled={preset.is_premium && !subscriptionInfo?.hasFeature('qr_customization')}
+                            disabled={preset.is_premium && (!subscriptionInfo?.plan || subscriptionInfo.plan.slug === 'starter')}
                             className={`group relative w-12 h-12 rounded-lg border-2 transition-all ${
-                              preset.is_premium && !subscriptionInfo?.hasFeature('qr_customization')
+                              preset.is_premium && (!subscriptionInfo?.plan || subscriptionInfo.plan.slug === 'starter')
                                 ? 'opacity-50 cursor-not-allowed border-slate-200'
                                 : 'border-slate-300 hover:border-primary cursor-pointer'
                             }`}
@@ -656,7 +656,7 @@ export default function QRPage() {
                             >
                               <div className="w-2 h-2 bg-white rounded-full opacity-80"></div>
                             </div>
-                            {preset.is_premium && !subscriptionInfo?.hasFeature('qr_customization') && (
+                            {preset.is_premium && (!subscriptionInfo?.plan || subscriptionInfo.plan.slug === 'starter') && (
                               <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center">
                                 <span className="text-white text-xs">🔒</span>
                               </div>
