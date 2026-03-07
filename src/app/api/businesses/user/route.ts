@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServer } from "@/lib/supabase-server";
+import { createSupabaseServer, createSupabaseServiceClient } from "@/lib/supabase-server";
 import { authenticateRequest } from "@/lib/auth-middleware";
 import { getTemporaryUserId } from "@/lib/temp-uuid";
 
@@ -15,11 +15,13 @@ export async function GET() {
     if (auth.isTempSession) {
       const deterministicUuid = getTemporaryUserId(auth.email);
       
-      const supabase = await createSupabaseServer();
-      console.log("🔍 [READ-DEBUG] Requête lecture:", {
+      const supabase = auth.isTempSession ? await createSupabaseServiceClient() : await createSupabaseServer();
+      console.log("🔍 [BUSINESS-READ-DEBUG] READ ENDPOINT:", {
+        sessionType: auth.isTempSession ? "TEMPORARY" : "SUPABASE",
+        clientType: auth.isTempSession ? "createSupabaseServiceClient()" : "createSupabaseServer()",
         email: auth.email,
-        uuid_calculé: deterministicUuid,
-        filtre_exact: `owner_user_id = '${deterministicUuid}'`
+        userId: deterministicUuid,
+        requete: `SELECT * FROM businesses WHERE owner_user_id = '${deterministicUuid}'`
       });
       
       const { data: businesses } = await supabase
@@ -28,7 +30,7 @@ export async function GET() {
         .eq('owner_user_id', deterministicUuid)
         .order('created_at', { ascending: false });
       
-      console.log("🔍 [READ-DEBUG] Résultat lecture:", {
+      console.log("🔍 [BUSINESS-READ-DEBUG] RÉSULTAT READ ENDPOINT:", {
         nombreEntreprises: businesses?.length || 0,
         entreprises: businesses?.map(b => ({
           id: b.id,

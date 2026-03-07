@@ -88,7 +88,14 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
   console.log("🏢 [BUSINESS-MANAGER] maxBusinesses calculé:", maxBusinesses);
 
   // Récupérer toutes les entreprises de l'utilisateur
-  console.log("🏢 [BUSINESS-MANAGER] Récupération entreprises pour user:", userId);
+  console.log("🔍 [BUSINESS-CHECK-DEBUG] QUOTA CHECK:", {
+    sessionType: auth.isTempSession ? "TEMPORARY" : "SUPABASE",
+    clientType: auth.isTempSession ? "createSupabaseServiceClient()" : "createSupabaseServer()",
+    userId: userId,
+    email: auth.email,
+    requete: `SELECT * FROM businesses WHERE owner_user_id = '${userId}'`
+  });
+  
   let businesses, error;
   
   if (auth.isTempSession) {
@@ -100,6 +107,15 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
       .order('created_at', { ascending: false });
     businesses = result.data;
     error = result.error;
+    
+    console.log("🔍 [BUSINESS-CHECK-DEBUG] RÉSULTAT QUOTA CHECK:", {
+      nombreEntreprises: businesses?.length || 0,
+      entreprises: businesses?.map(b => ({
+        id: b.id,
+        name: b.name,
+        owner_user_id: b.owner_user_id
+      }))
+    });
   } else {
     const result = await supabase
       .from('businesses')
@@ -108,6 +124,15 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
       .order('created_at', { ascending: false });
     businesses = result.data;
     error = result.error;
+    
+    console.log("🔍 [BUSINESS-CHECK-DEBUG] RÉSULTAT QUOTA CHECK:", {
+      nombreEntreprises: businesses?.length || 0,
+      entreprises: businesses?.map(b => ({
+        id: b.id,
+        name: b.name,
+        owner_user_id: b.owner_user_id
+      }))
+    });
   }
 
   if (error) {
