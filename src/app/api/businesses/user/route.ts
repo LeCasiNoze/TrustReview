@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase-server";
 import { authenticateRequest } from "@/lib/auth-middleware";
+import { getTemporaryUserId } from "@/lib/temp-uuid";
 
 export async function GET() {
   try {
@@ -12,14 +13,7 @@ export async function GET() {
 
     // Si session temporaire, récupérer les entreprises avec l'UUID déterministe
     if (auth.isTempSession) {
-      const emailHash = require('crypto').createHash('sha256').update(auth.email).digest('hex');
-      const deterministicUuid = [
-        emailHash.substring(0, 8),
-        emailHash.substring(8, 12),
-        emailHash.substring(12, 16),
-        emailHash.substring(16, 20),
-        emailHash.substring(20, 32)
-      ].join('-');
+      const deterministicUuid = getTemporaryUserId(auth.email);
       
       const supabase = await createSupabaseServer();
       const { data: businesses } = await supabase

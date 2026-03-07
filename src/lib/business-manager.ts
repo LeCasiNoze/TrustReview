@@ -1,5 +1,6 @@
-import { createSupabaseServer, createSupabaseServiceClient } from './supabase-server';
-import { authenticateRequest } from './auth-middleware';
+import { createSupabaseServer, createSupabaseServiceClient } from "@/lib/supabase-server";
+import { authenticateRequest } from "@/lib/auth-middleware";
+import { getTemporaryUserId } from "@/lib/temp-uuid";
 import { randomUUID } from 'crypto';
 
 export interface Business {
@@ -57,16 +58,8 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
       }
     };
     subscriptionError = null;
-    // Pour les sessions temporaires, générer un UUID déterministe basé sur l'email
-    const emailHash = require('crypto').createHash('sha256').update(auth.email).digest('hex');
-    const deterministicUuid = [
-      emailHash.substring(0, 8),
-      emailHash.substring(8, 12),
-      emailHash.substring(12, 16),
-      emailHash.substring(16, 20),
-      emailHash.substring(20, 32)
-    ].join('-');
-    userId = deterministicUuid;
+    // Pour les sessions temporaires, générer un UUID déterministe via helper partagé
+    userId = getTemporaryUserId(auth.email);
   } else {
     userId = auth.user.id;
     console.log("🏢 [BUSINESS-MANAGER] Récupération abonnement pour user:", userId);
@@ -218,16 +211,8 @@ export async function createBusiness(businessData: Partial<Business>): Promise<B
   // Déterminer l'ID utilisateur selon le type d'authentification
   let userId: string;
   if (auth.isTempSession) {
-    // Pour les sessions temporaires, générer le même UUID déterministe basé sur l'email
-    const emailHash = require('crypto').createHash('sha256').update(auth.email).digest('hex');
-    const deterministicUuid = [
-      emailHash.substring(0, 8),
-      emailHash.substring(8, 12),
-      emailHash.substring(12, 16),
-      emailHash.substring(16, 20),
-      emailHash.substring(20, 32)
-    ].join('-');
-    userId = deterministicUuid;
+    // Pour les sessions temporaires, générer le même UUID déterministe via helper partagé
+    userId = getTemporaryUserId(auth.email);
   } else {
     userId = auth.user.id; // Pour les sessions Supabase, stocker l'UUID
   }
