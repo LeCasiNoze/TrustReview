@@ -240,7 +240,7 @@ export async function createBusiness(businessData: Partial<Business>): Promise<B
     .single();
 
   // LOGS DIAGNOSTIC - Étape 5: Résultat de l'insert
-  console.log("🔍 [DIAG] POST-INSERT RESULT:", {
+  console.log("🔍 [INSERT-DEBUG] LIGNE CRÉÉE:", {
     success: !error,
     error: error ? {
       message: error.message,
@@ -248,10 +248,18 @@ export async function createBusiness(businessData: Partial<Business>): Promise<B
       details: error.details,
       hint: error.hint
     } : null,
-    dataId: data?.id,
+    ligneInsérée: data ? {
+      id: data.id,
+      name: data.name,
+      slug: data.slug,
+      owner_user_id: data.owner_user_id,
+      is_active: data.is_active,
+      created_at: data.created_at,
+      updated_at: data.updated_at
+    } : null,
     sessionType: auth.isTempSession ? "TEMPORARY" : "SUPABASE",
     clientUsed: clientType,
-    owner_user_id: userId
+    owner_user_id_utilisé: userId
   });
 
   if (error) {

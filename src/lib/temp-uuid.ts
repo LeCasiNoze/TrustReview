@@ -21,5 +21,7 @@ export function generateDeterministicUuid(email: string): string {
  * Exemple: sankush.vevo@gmail.com → 5d41402a-bc4b-2a76-b971-9d911017c592
  */
 export function getTemporaryUserId(email: string): string {
-  return generateDeterministicUuid(email);
+  const uuid = generateDeterministicUuid(email);
+  console.log("🔍 [UUID-DEBUG] Email:", email, "→ UUID:", uuid);
+  return uuid;
 }

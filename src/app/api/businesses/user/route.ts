@@ -16,11 +16,26 @@ export async function GET() {
       const deterministicUuid = getTemporaryUserId(auth.email);
       
       const supabase = await createSupabaseServer();
+      console.log("🔍 [READ-DEBUG] Requête lecture:", {
+        email: auth.email,
+        uuid_calculé: deterministicUuid,
+        filtre_exact: `owner_user_id = '${deterministicUuid}'`
+      });
+      
       const { data: businesses } = await supabase
         .from('businesses')
         .select('*')
         .eq('owner_user_id', deterministicUuid)
         .order('created_at', { ascending: false });
+      
+      console.log("🔍 [READ-DEBUG] Résultat lecture:", {
+        nombreEntreprises: businesses?.length || 0,
+        entreprises: businesses?.map(b => ({
+          id: b.id,
+          name: b.name,
+          owner_user_id: b.owner_user_id
+        }))
+      });
       
       return NextResponse.json({
         businesses: Array.isArray(businesses) ? businesses : [],
