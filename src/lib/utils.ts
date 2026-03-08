@@ -30,3 +30,16 @@ export function getPublicUrlForPath(path: string): string {
   const baseUrl = getPublicUrl();
   return `${baseUrl}${path.startsWith('/') ? path : '/' + path}`;
 }
+
+export function isValidHttpUrl(url?: string | null): boolean {
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch (error) {
+    return false;
+  }
+}

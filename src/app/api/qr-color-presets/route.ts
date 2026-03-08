@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServer } from "@/lib/supabase-server";
-import { getQRColorPresets, getUserSubscriptionInfo } from "@/lib/subscription";
+import { getQRColorPresets } from "@/lib/subscription";
+import { getUserSubscriptionInfoServer } from "@/lib/subscription.server";
 
 export async function GET() {
   try {
     const [presets, subscriptionInfo] = await Promise.all([
       getQRColorPresets(),
-      getUserSubscriptionInfo()
+      getUserSubscriptionInfoServer()
     ]);
 
     // Filtrer les presets selon le plan
