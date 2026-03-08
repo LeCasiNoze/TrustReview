@@ -2,6 +2,7 @@ import { createSupabaseServer, createSupabaseServiceClient } from "@/lib/supabas
 import { authenticateRequest } from "@/lib/auth-middleware";
 import { getTemporaryUserId } from "@/lib/temp-uuid";
 import { randomUUID } from 'crypto';
+import { getPlanQuotas, calculateRemainingQuotas } from "@/lib/quotas";
 
 export interface Business {
   id: string;
@@ -53,8 +54,7 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
     console.log("🏢 [BUSINESS-MANAGER] Session temporaire détectée, utilisation abonnement starter par défaut");
     subscription = {
       plan: {
-        slug: 'starter',
-        max_businesses: 1
+        slug: 'starter'
       }
     };
     subscriptionError = null;
@@ -67,7 +67,7 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
       .from('subscriptions')
       .select(`
         *,
-        plan:subscription_plans(slug, max_businesses)
+        plan:subscription_plans(slug)
       `)
       .eq('user_id', userId)
       .single();
@@ -80,12 +80,12 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
   }
 
   console.log("🏢 [BUSINESS-MANAGER] Subscription trouvée:", subscription ? {
-    plan: subscription.plan?.slug,
-    max_businesses: subscription.plan?.max_businesses
+    plan: subscription.plan?.slug
   } : 'null');
 
-  const maxBusinesses = subscription?.plan?.max_businesses ?? 1; // Default starter limit
-  console.log("🏢 [BUSINESS-MANAGER] maxBusinesses calculé:", maxBusinesses);
+  // Utiliser la source de vérité unique pour les quotas
+  const planQuotas = getPlanQuotas(subscription?.plan?.slug);
+  console.log("🏢 [BUSINESS-MANAGER] Plan quotas utilisés:", planQuotas);
 
   // Récupérer toutes les entreprises de l'utilisateur
   console.log("🔍 [BUSINESS-CHECK-DEBUG] QUOTA CHECK:", {
@@ -143,12 +143,12 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
   const businessList = businesses || [];
   console.log("🏢 [BUSINESS-MANAGER] Entreprises trouvées:", businessList.length);
   
-  const canCreateMore = maxBusinesses === null || businessList.length < maxBusinesses;
-  const remainingSlots = maxBusinesses === null ? null : Math.max(0, maxBusinesses - businessList.length);
+  const canCreateMore = planQuotas.max_businesses === null || businessList.length < planQuotas.max_businesses;
+  const remainingSlots = planQuotas.max_businesses === null ? null : Math.max(0, planQuotas.max_businesses - businessList.length);
   
   console.log("🏢 [BUSINESS-MANAGER] Calcul quotas:", {
     businessListLength: businessList.length,
-    maxBusinesses,
+    maxBusinesses: planQuotas.max_businesses,
     canCreateMore,
     remainingSlots
   });

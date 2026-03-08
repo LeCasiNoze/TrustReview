@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import QRCode from "qrcode";
 import { QRColorPreset } from "@/lib/types/subscription";
 import { getPublicUrlForPath } from "@/lib/utils";
+import { getQuotaLimitMessage } from "@/lib/quotas";
 
 interface QRCode {
   id: string;
@@ -289,9 +290,10 @@ export default function QRPage() {
   const createQRCode = async () => {
     if (!business || !newQR.location.trim()) return;
 
-    // Vérifier les limites d'abonnement
+    // Vérifier les limites d'abonnement avec message robuste
     if (!subscriptionInfo?.canCreateQR) {
-      alert(`Vous avez atteint votre limite de ${subscriptionInfo.plan?.max_qr_codes} QR codes. Passez à un plan supérieur pour en créer plus !`);
+      const message = getQuotaLimitMessage('create_qr', subscriptionInfo.plan?.slug, subscriptionInfo.remainingQRCodes);
+      alert(message || "Vous ne pouvez pas créer de QR code avec votre plan actuel.");
       return;
     }
 

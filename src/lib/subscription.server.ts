@@ -1,6 +1,7 @@
 import "server-only";
-import { createSupabaseServer } from "./supabase-server";
-import { UserSubscriptionInfo, SubscriptionPlan } from "./types/subscription";
+import { createSupabaseServer } from "@/lib/supabase-server";
+import { Subscription, SubscriptionPlan, UserSubscriptionInfo } from "@/lib/types/subscription";
+import { calculateRemainingQuotas } from "@/lib/quotas";
 
 export async function getUserSubscriptionInfoServer(): Promise<UserSubscriptionInfo | null> {
   const supabase = await createSupabaseServer();
@@ -97,14 +98,17 @@ export async function getUserSubscriptionInfoServer(): Promise<UserSubscriptionI
     trialDaysLeft = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
   }
 
+  // Utiliser la source de vérité unique pour les quotas
+  const quotas = calculateRemainingQuotas(plan.slug, businessCount, qrCount);
+  
   return {
     subscription,
     plan,
     features: plan.features,
-    canCreateQR: plan.max_qr_codes === null || plan.max_qr_codes > qrCount,
-    canCreateBusiness: plan.max_businesses === null || plan.max_businesses > businessCount,
-    remainingQRCodes: plan.max_qr_codes ? Math.max(0, plan.max_qr_codes - qrCount) : null,
-    remainingBusinesses: plan.max_businesses ? Math.max(0, plan.max_businesses - businessCount) : null,
+    canCreateQR: quotas.canCreateQR,
+    canCreateBusiness: quotas.canCreateBusiness,
+    remainingQRCodes: quotas.remainingQRCodes,
+    remainingBusinesses: quotas.remainingBusinesses,
     isTrialActive: subscription.status === 'trial' && trialDaysLeft > 0,
     trialDaysLeft,
     hasFeature: (feature: string) => plan.features[feature] || false

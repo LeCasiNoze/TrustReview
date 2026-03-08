@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest } from "@/lib/auth-middleware";
 import { getTemporaryUserId } from "@/lib/temp-uuid";
+import { getPlanQuotas, getQuotaLimitMessage } from "@/lib/quotas";
 
 export async function GET(request: NextRequest) {
   try {
@@ -129,19 +130,23 @@ export async function POST(request: NextRequest) {
       .eq('user_id', authUser.id)
       .single();
     
-    // Determine max QR codes based on plan
-    let maxQRCodes: number | null = 5; // Default starter limit
-    if (subscription?.plan?.slug === 'pro') {
-      maxQRCodes = 50;
-    } else if (subscription?.plan?.slug === 'agency') {
-      maxQRCodes = null; // Unlimited
-    }
+    // Utiliser la source de vérité unique pour les quotas
+    const planQuotas = getPlanQuotas(subscription?.plan?.slug);
+    const currentQRCodes = existingQRCodes?.length || 0;
     
-    // Check limit (only if not unlimited)
-    if (maxQRCodes !== null && existingQRCodes && existingQRCodes.length >= maxQRCodes) {
+    console.log("🔍 [QR-CODES-QUOTA-DEBUG] Quotas check:", {
+      planSlug: subscription?.plan?.slug,
+      maxQRCodes: planQuotas.max_qr_codes,
+      currentQRCodes: currentQRCodes,
+      canCreate: planQuotas.max_qr_codes === null || currentQRCodes < planQuotas.max_qr_codes
+    });
+    
+    // Check limit using unified logic
+    if (planQuotas.max_qr_codes !== null && currentQRCodes >= planQuotas.max_qr_codes) {
+      const message = getQuotaLimitMessage('create_qr', subscription?.plan?.slug, 0);
       return NextResponse.json({ 
         error: 'QR code limit reached', 
-        details: `Maximum ${maxQRCodes} QR codes allowed for ${subscription?.plan?.slug || 'starter'} plan`
+        details: message
       }, { status: 400 });
     }
     
