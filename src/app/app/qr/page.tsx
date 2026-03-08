@@ -82,13 +82,21 @@ export default function QRPage() {
   const loadSubscriptionData = async () => {
     try {
       const [subscriptionResponse, presetsResponse] = await Promise.all([
-        fetch("/api/subscription"),
+        fetch("/api/subscription-info"), // ← UTILISER LA SOURCE DE VÉRITÉ
         fetch("/api/qr-color-presets")
       ]);
 
       if (subscriptionResponse.ok) {
         const subscriptionData = await subscriptionResponse.json();
+        console.log("🔍 [QR-FRONT-DEBUG] Subscription data loaded:", {
+          canCreateQR: subscriptionData.canCreateQR,
+          remainingQRCodes: subscriptionData.remainingQRCodes,
+          plan: subscriptionData.plan?.slug,
+          planName: subscriptionData.plan?.name
+        });
         setSubscriptionInfo(subscriptionData);
+      } else {
+        console.error("🔍 [QR-FRONT-DEBUG] Subscription API failed:", subscriptionResponse.status);
       }
 
       if (presetsResponse.ok) {
@@ -290,22 +298,37 @@ export default function QRPage() {
   const createQRCode = async () => {
     if (!business || !newQR.location.trim()) return;
 
+    // DEBUG: État des variables de blocage
+    console.log("🔍 [QR-FRONT-DEBUG] Create QR attempt:", {
+      hasBusiness: !!business,
+      hasLocation: newQR.location.trim().length > 0,
+      hasSubscriptionInfo: !!subscriptionInfo,
+      canCreateQR: subscriptionInfo?.canCreateQR,
+      remainingQRCodes: subscriptionInfo?.remainingQRCodes,
+      planSlug: subscriptionInfo?.plan?.slug,
+      planName: subscriptionInfo?.plan?.name
+    });
+
     // Vérifier les limites d'abonnement avec message robuste
     if (!subscriptionInfo?.canCreateQR) {
+      console.log("🔍 [QR-FRONT-DEBUG] blocking create before POST - canCreateQR = false");
       const message = getQuotaLimitMessage('create_qr', subscriptionInfo.plan?.slug, subscriptionInfo.remainingQRCodes);
       alert(message || "Vous ne pouvez pas créer de QR code avec votre plan actuel.");
       return;
     }
 
-    // Vérifier si l'abonnement est actif
-    const subscriptionResponse = await fetch('/api/subscription');
+    // Vérifier si l'abonnement est actif (utiliser la même source de vérité)
+    const subscriptionResponse = await fetch('/api/subscription-info');
     const subscriptionData = await subscriptionResponse.json();
     
     if (!subscriptionData.canAccess || subscriptionData.subscriptionStatus === 'canceled' || subscriptionData.subscriptionStatus === 'past_due') {
+      console.log("🔍 [QR-FRONT-DEBUG] blocking create - subscription inactive");
       alert('Votre abonnement a expiré. Renouvelez-le pour continuer à créer des QR codes.');
       window.location.href = '/app/billing';
       return;
     }
+
+    console.log("🔍 [QR-FRONT-DEBUG] sending POST /api/qr-codes");
 
     try {
       // Generate automatic name: QR_X_Emplacement
