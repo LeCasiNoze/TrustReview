@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest } from "@/lib/auth-middleware";
 import { getTemporaryUserId } from "@/lib/temp-uuid";
 import { getPlanQuotas, getQuotaLimitMessage } from "@/lib/quotas";
+import { getActiveBusiness } from "@/lib/active-business";
 
 export async function GET(request: NextRequest) {
   try {
@@ -59,22 +60,24 @@ export async function GET(request: NextRequest) {
     const user = await requireUserServer()
     const supabase = await createSupabaseServer()
     
-    // Get business for the user
-    const { data: business } = await supabase
-      .from('businesses')
-      .select('id')
-      .eq('owner_user_id', user.id)
-      .single()
+    // Utiliser la source de vérité unique : entreprise active
+    const activeBusiness = await getActiveBusiness();
     
-    if (!business) {
-      return NextResponse.json({ error: 'Business not found' }, { status: 404 })
+    if (!activeBusiness) {
+      console.log("🔍 [QR-CODES-GET] Aucune entreprise active trouvée");
+      return NextResponse.json({ qrCodes: [] });
     }
     
-    // Get QR codes for the business
+    console.log("🔍 [QR-CODES-GET] Utilisation entreprise active:", {
+      businessId: activeBusiness.id,
+      businessName: activeBusiness.name
+    });
+    
+    // Get QR codes for the ACTIVE business
     const { data: qrCodes, error } = await supabase
       .from('qr_codes')
       .select('*')
-      .eq('business_id', business.id)
+      .eq('business_id', activeBusiness.id)
       .order('created_at', { ascending: false })
     
     if (error) {
@@ -97,22 +100,24 @@ export async function POST(request: NextRequest) {
     
     const formData = await request.formData()
     
-    // Get business for the user
-    const { data: business } = await supabase
-      .from('businesses')
-      .select('id, name, slug')
-      .eq('owner_user_id', user.id)
-      .single()
+    // Utiliser la source de vérité unique : entreprise active
+    const activeBusiness = await getActiveBusiness();
     
-    if (!business) {
-      return NextResponse.json({ error: 'Business not found' }, { status: 404 })
+    if (!activeBusiness) {
+      console.log("🔍 [QR-CODES-POST] Aucune entreprise active trouvée");
+      return NextResponse.json({ error: 'No active business found' }, { status: 404 });
     }
     
-    // Check QR code limit based on user's plan
+    console.log("🔍 [QR-CODES-POST] Utilisation entreprise active:", {
+      businessId: activeBusiness.id,
+      businessName: activeBusiness.name
+    });
+    
+    // Check QR code limit based on user's plan (ACTIVE BUSINESS)
     const { data: existingQRCodes } = await supabase
       .from('qr_codes')
       .select('id')
-      .eq('business_id', business.id)
+      .eq('business_id', activeBusiness.id)
     
     // Get user's subscription info to check quotas
     const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -151,7 +156,7 @@ export async function POST(request: NextRequest) {
     }
     
     const qrCodeData = {
-      business_id: business.id,
+      business_id: activeBusiness.id,
       name: formData.get('name') as string || `QR Code ${existingQRCodes?.length ? existingQRCodes.length + 1 : 1}`,
       location: formData.get('location') as string || '',
       is_active: formData.get('is_active') === 'true',
