@@ -3,6 +3,7 @@ import { authenticateRequest } from "@/lib/auth-middleware";
 import { getTemporaryUserId } from "@/lib/temp-uuid";
 import { randomUUID } from 'crypto';
 import { getPlanQuotas, calculateRemainingQuotas } from "@/lib/quotas";
+import { setFirstBusinessAsActive } from "@/lib/active-business";
 
 export interface Business {
   id: string;
@@ -292,9 +293,9 @@ export async function createBusiness(businessData: Partial<Business>): Promise<B
     throw error;
   }
 
-  // Définir comme entreprise active si c'est la première
+  // Définir comme entreprise active si c'est la première (source de vérité unique)
   if (businessManager.businesses.length === 0) {
-    await setActiveBusiness(data.id);
+    await setFirstBusinessAsActive(userId, auth.isTempSession);
   }
 
   return data;

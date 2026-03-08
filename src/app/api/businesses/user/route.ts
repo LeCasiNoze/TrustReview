@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseServer, createSupabaseServiceClient } from "@/lib/supabase-server";
 import { authenticateRequest } from "@/lib/auth-middleware";
 import { getTemporaryUserId } from "@/lib/temp-uuid";
+import { getActiveBusiness, setActiveBusiness, cleanupMultipleActiveBusinesses } from "@/lib/active-business";
 
 export async function GET() {
   try {
@@ -62,17 +63,16 @@ export async function GET() {
       .eq('owner_user_id', user.id)
       .order('created_at', { ascending: false });
 
-    // Get active business
-    const { data: activeBusiness } = await supabase
-      .from('user_preferences')
-      .select('active_business_id')
-      .eq('user_id', user.id)
-      .single();
+    // Nettoyer les entreprises actives multiples (sécurité)
+    await cleanupMultipleActiveBusinesses(user.id, false);
 
-    // Toujours retourner une structure cohérente
+    // Récupérer l'entreprise active avec la source de vérité unique
+    const activeBusinessData = await getActiveBusiness();
+
     return NextResponse.json({
       businesses: Array.isArray(businesses) ? businesses : [],
-      activeBusinessId: activeBusiness?.active_business_id || null,
+      activeBusinessId: activeBusinessData?.id || null,
+      activeBusiness: activeBusinessData,
       canCreateMore: true, // TODO: Calculer selon l'abonnement
       remainingSlots: null // TODO: Calculer selon l'abonnement
     });
@@ -91,24 +91,13 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const { businessId } = await req.json();
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
     
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!businessId) {
+      return NextResponse.json({ error: "Business ID required" }, { status: 400 });
     }
 
-    // Set active business
-    const { error } = await supabase
-      .from('user_preferences')
-      .upsert({
-        user_id: user.id,
-        active_business_id: businessId
-      });
-
-    if (error) {
-      return NextResponse.json({ error: "Failed to set active business" }, { status: 500 });
-    }
+    // Utiliser la source de vérité unique pour l'activation
+    await setActiveBusiness(businessId);
 
     return NextResponse.json({ success: true });
   } catch (error) {
