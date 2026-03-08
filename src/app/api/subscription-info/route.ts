@@ -15,17 +15,24 @@ export async function GET() {
       }, { status: 404 });
     }
 
-    // Transformer pour le frontend
+    const planData = subscriptionInfo.plan ? {
+      slug: subscriptionInfo.plan.slug ?? null,
+      name: subscriptionInfo.plan.name ?? null,
+      max_qr_codes: subscriptionInfo.plan.max_qr_codes ?? null,
+      max_businesses: subscriptionInfo.plan.max_businesses ?? null
+    } : null;
+
+    // Transformer pour le frontend (shape stable)
     return NextResponse.json({
       canAccess: true,
       subscriptionStatus: subscriptionInfo.subscription?.status || 'active',
-      plan: subscriptionInfo.plan,
-      canCreateQR: subscriptionInfo.canCreateQR,
-      canCreateBusiness: subscriptionInfo.canCreateBusiness,
-      remainingQRCodes: subscriptionInfo.remainingQRCodes,
-      remainingBusinesses: subscriptionInfo.remainingBusinesses,
-      isTrialActive: subscriptionInfo.isTrialActive,
-      trialDaysLeft: subscriptionInfo.trialDaysLeft
+      plan: planData,
+      canCreateQR: Boolean(subscriptionInfo.canCreateQR),
+      canCreateBusiness: Boolean(subscriptionInfo.canCreateBusiness),
+      remainingQRCodes: subscriptionInfo.remainingQRCodes ?? null,
+      remainingBusinesses: subscriptionInfo.remainingBusinesses ?? null,
+      isTrialActive: Boolean(subscriptionInfo.isTrialActive),
+      trialDaysLeft: subscriptionInfo.trialDaysLeft ?? 0
     });
   } catch (error) {
     console.error('Error fetching subscription info:', error);

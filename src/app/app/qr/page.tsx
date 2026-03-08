@@ -45,6 +45,7 @@ export default function QRPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [colorPresets, setColorPresets] = useState<QRColorPreset[]>([]);
   const [subscriptionInfo, setSubscriptionInfo] = useState<any>(null);
+  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
     location: "",
     is_active: true,
@@ -89,14 +90,16 @@ export default function QRPage() {
       if (subscriptionResponse.ok) {
         const subscriptionData = await subscriptionResponse.json();
         console.log("🔍 [QR-FRONT-DEBUG] Subscription data loaded:", {
-          canCreateQR: subscriptionData.canCreateQR,
-          remainingQRCodes: subscriptionData.remainingQRCodes,
-          plan: subscriptionData.plan?.slug,
-          planName: subscriptionData.plan?.name
+          canCreateQR: subscriptionData?.canCreateQR,
+          remainingQRCodes: subscriptionData?.remainingQRCodes,
+          plan: subscriptionData?.plan?.slug,
+          planName: subscriptionData?.plan?.name
         });
         setSubscriptionInfo(subscriptionData);
+        setSubscriptionError(null);
       } else {
         console.error("🔍 [QR-FRONT-DEBUG] Subscription API failed:", subscriptionResponse.status);
+        setSubscriptionError("Impossible de charger votre abonnement. Veuillez réessayer.");
       }
 
       if (presetsResponse.ok) {
@@ -105,6 +108,7 @@ export default function QRPage() {
       }
     } catch (error) {
       console.error('Error loading subscription data:', error);
+      setSubscriptionError("Erreur lors du chargement de l'abonnement");
     }
   };
 
@@ -299,20 +303,29 @@ export default function QRPage() {
     if (!business || !newQR.location.trim()) return;
 
     // DEBUG: État des variables de blocage
+    const planSlug = subscriptionInfo?.plan?.slug ?? 'starter';
+    const planName = subscriptionInfo?.plan?.name ?? 'Plan inconnu';
+
     console.log("🔍 [QR-FRONT-DEBUG] Create QR attempt:", {
       hasBusiness: !!business,
       hasLocation: newQR.location.trim().length > 0,
       hasSubscriptionInfo: !!subscriptionInfo,
       canCreateQR: subscriptionInfo?.canCreateQR,
       remainingQRCodes: subscriptionInfo?.remainingQRCodes,
-      planSlug: subscriptionInfo?.plan?.slug,
-      planName: subscriptionInfo?.plan?.name
+      planSlug,
+      planName
     });
+
+    if (!subscriptionInfo) {
+      console.log("🔍 [QR-FRONT-DEBUG] blocking create - subscriptionInfo null");
+      alert("Impossible de déterminer votre abonnement. Veuillez recharger la page ou réessayer dans quelques instants.");
+      return;
+    }
 
     // Vérifier les limites d'abonnement avec message robuste
     if (!subscriptionInfo?.canCreateQR) {
       console.log("🔍 [QR-FRONT-DEBUG] blocking create before POST - canCreateQR = false");
-      const message = getQuotaLimitMessage('create_qr', subscriptionInfo.plan?.slug, subscriptionInfo.remainingQRCodes);
+      const message = getQuotaLimitMessage('create_qr', planSlug, subscriptionInfo.remainingQRCodes);
       alert(message || "Vous ne pouvez pas créer de QR code avec votre plan actuel.");
       return;
     }
@@ -594,8 +607,11 @@ export default function QRPage() {
     );
   }
 
+  const planSlug = subscriptionInfo?.plan?.slug ?? 'starter';
+  const planName = subscriptionInfo?.plan?.name ?? (subscriptionInfo ? 'Plan actuel' : 'Plan en chargement');
   const qrLimit = subscriptionInfo?.plan?.max_qr_codes ?? null;
   const canCreate = subscriptionInfo?.canCreateQR ?? false;
+  const canUsePremiumPresets = planSlug !== 'starter' && !!subscriptionInfo;
 
   /* ─────────────────────────────────────────── */
   return (
@@ -607,10 +623,15 @@ export default function QRPage() {
           <h1 className="page-title">QR Codes</h1>
           <p className="page-desc">
             {qrCodes.length}/{qrLimit === null ? '∞' : qrLimit} codes · 
-            <span className="font-medium" style={{ color:"hsl(226 71% 55%)" }}> {subscriptionInfo?.plan?.name || 'Chargement...'}</span> · 
-            {subscriptionInfo?.plan?.slug !== 'starter' ? 'Personnalisation complète' : 'Personnalisation de base'}
+            <span className="font-medium" style={{ color:"hsl(226 71% 55%)" }}> {planName}</span> · 
+            {canUsePremiumPresets ? 'Personnalisation complète' : 'Personnalisation de base'}
           </p>
         </div>
+        {subscriptionError && (
+          <div className="text-sm text-amber-600">
+            {subscriptionError}
+          </div>
+        )}
         {canCreate && (
           <Button size="sm" onClick={() => setShowCreateForm(v => !v)}>
             <svg className="mr-1.5" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
