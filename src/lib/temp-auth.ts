@@ -7,8 +7,15 @@ export interface TempSession {
 }
 
 export async function getTempSession(): Promise<TempSession | null> {
+  let cookieStore;
   try {
-    const cookieStore = await cookies();
+    cookieStore = await cookies();
+  } catch (error) {
+    // En phase de build ou contexte statique, cookies() peut lancer une erreur
+    return null;
+  }
+
+  try {
     const sessionCookie = cookieStore.get('temp-session');
     
     if (!sessionCookie) {
@@ -19,13 +26,16 @@ export async function getTempSession(): Promise<TempSession | null> {
     
     // Vérifier si la session est expirée
     if (Date.now() > session.expires) {
-      (await cookies()).delete('temp-session');
+      cookieStore.delete('temp-session');
       return null;
     }
 
     return session;
   } catch (error) {
-    console.error('Error parsing temp session:', error);
+    // En cas de JSON invalide ou autre, supprimer silencieusement
+    try {
+      cookieStore?.delete('temp-session');
+    } catch {}
     return null;
   }
 }
