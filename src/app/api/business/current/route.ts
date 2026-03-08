@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServer } from "@/lib/supabase-server";
+import { createSupabaseServer, createSupabaseServiceClient } from "@/lib/supabase-server";
 import { authenticateRequest } from "@/lib/auth-middleware";
+import { getTemporaryUserId } from "@/lib/temp-uuid";
 
 export async function GET() {
   try {
@@ -13,20 +14,30 @@ export async function GET() {
 
     console.log("Business API - Authenticated:", { email: auth.email, isTemp: auth.isTempSession });
 
-    // Si session temporaire, retourner des données factices
+    // Si session temporaire, récupérer la vraie entreprise avec UUID déterministe
     if (auth.isTempSession) {
-      return NextResponse.json({
-        id: "temp-business-id",
-        name: "Votre entreprise",
-        slug: "temp-business",
-        description: "Configurez votre entreprise",
-        user_id: "temp-user",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        qr_background_color: "#ffffff",
-        qr_foreground_color: "#000000",
-        is_temp: true
+      const supabase = await createSupabaseServiceClient();
+      const userId = getTemporaryUserId(auth.email);
+      
+      console.log("🔍 [BUSINESS-CURRENT-DEBUG] Session temporaire:", {
+        email: auth.email,
+        userId: userId,
+        clientType: "createSupabaseServiceClient()"
       });
+      
+      const { data: business, error } = await supabase
+        .from("businesses")
+        .select("id, name, slug, google_review_url, threshold_positive, is_active, logo_url, notification_email, notif_new_review, notif_low_rating")
+        .eq("owner_user_id", userId)
+        .single();
+      
+      if (error || !business) {
+        console.log("🔍 [BUSINESS-CURRENT-DEBUG] Aucune entreprise trouvée pour session temporaire");
+        return NextResponse.json({ error: "Business not found" }, { status: 404 });
+      }
+      
+      console.log("🔍 [BUSINESS-CURRENT-DEBUG] Entreprise trouvée pour session temporaire:", business.id);
+      return NextResponse.json(business);
     }
 
     // Authentification Supabase normale

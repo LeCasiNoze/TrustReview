@@ -1,8 +1,9 @@
-import { createSupabaseServer } from '@/lib/supabase-server'
+import { createSupabaseServer, createSupabaseServiceClient } from '@/lib/supabase-server'
 import { requireUserServer } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest } from "@/lib/auth-middleware";
+import { getTemporaryUserId } from "@/lib/temp-uuid";
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,14 +13,45 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Si session temporaire, retourner des données factices
+    // Si session temporaire, récupérer les vrais QR codes avec UUID déterministe
     if (auth.isTempSession) {
-      return NextResponse.json({
-        qrCodes: [],
-        total: 0,
-        active: 0,
-        inactive: 0
+      const supabase = await createSupabaseServiceClient();
+      const userId = getTemporaryUserId(auth.email);
+      
+      console.log("🔍 [QR-CODES-DEBUG] Session temporaire:", {
+        email: auth.email,
+        userId: userId,
+        clientType: "createSupabaseServiceClient()"
       });
+      
+      // Get business for the user
+      const { data: business } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('owner_user_id', userId)
+        .single()
+      
+      if (!business) {
+        console.log("🔍 [QR-CODES-DEBUG] Aucune entreprise trouvée pour session temporaire");
+        return NextResponse.json({ qrCodes: [] });
+      }
+      
+      console.log("🔍 [QR-CODES-DEBUG] Entreprise trouvée pour session temporaire:", business.id);
+      
+      // Get QR codes for the business
+      const { data: qrCodes, error } = await supabase
+        .from('qr_codes')
+        .select('*')
+        .eq('business_id', business.id)
+        .order('created_at', { ascending: false })
+      
+      if (error) {
+        console.error("🔍 [QR-CODES-DEBUG] Erreur récupération QR codes:", error);
+        return NextResponse.json({ qrCodes: [] });
+      }
+      
+      console.log("🔍 [QR-CODES-DEBUG] QR codes trouvés:", qrCodes?.length || 0);
+      return NextResponse.json({ qrCodes: qrCodes || [] });
     }
 
     // Authentification Supabase normale

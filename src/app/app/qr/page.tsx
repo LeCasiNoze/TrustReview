@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import QRCode from "qrcode";
 import { QRColorPreset } from "@/lib/types/subscription";
+import { getPublicUrlForPath } from "@/lib/utils";
 
 interface QRCode {
   id: string;
@@ -215,7 +216,7 @@ export default function QRPage() {
       `;
       
       // Add QR code
-      const qrData = await QRCode.toDataURL(`https://trustreview.fr/r/${business.slug}`, {
+      const qrData = await QRCode.toDataURL(getPublicUrlForPath(`/r/${business.slug}`), {
         color: {
           dark: foregroundColor,
           light: backgroundColor
@@ -249,7 +250,7 @@ export default function QRPage() {
       return URL.createObjectURL(svgBlob);
     } else {
       // Simple QR code only
-      const qrData = await QRCode.toDataURL(`https://trustreview.fr/r/${business.slug}`, {
+      const qrData = await QRCode.toDataURL(getPublicUrlForPath(`/r/${business.slug}`), {
         color: {
           dark: foregroundColor,
           light: backgroundColor
@@ -429,7 +430,7 @@ export default function QRPage() {
       `;
       
       // Add QR code
-      const qrData = await QRCode.toDataURL(`https://trustreview.fr/r/${business.slug}`, {
+      const qrData = await QRCode.toDataURL(getPublicUrlForPath(`/r/${business.slug}`), {
         color: {
           dark: foregroundColor,
           light: backgroundColor
@@ -464,7 +465,7 @@ export default function QRPage() {
       setPreviewUrl(svgUrl);
     } else {
       // Simple QR code only
-      const qrData = await QRCode.toDataURL(`https://trustreview.fr/r/${business.slug}`, {
+      const qrData = await QRCode.toDataURL(getPublicUrlForPath(`/r/${business.slug}`), {
         color: {
           dark: foregroundColor,
           light: backgroundColor

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { getPublicUrlForPath } from "@/lib/utils";
 interface Business {
   id: string;
   name: string;
@@ -183,7 +184,7 @@ export default function BusinessesPage() {
                 placeholder="restaurant-le-gourmet"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Sera utilisé dans l'URL : trustreview.fr/r/{newBusiness.slug || 'identifiant'}
+                Sera utilisé dans l'URL : {getPublicUrlForPath(`/r/${newBusiness.slug || 'identifiant'}`).replace('https://', '').replace('http://', '')}
               </p>
             </div>
 
@@ -257,7 +258,7 @@ export default function BusinessesPage() {
                     
                     <div>
                       <h3 className="font-semibold text-lg">{business.name}</h3>
-                      <p className="text-sm text-muted-foreground">trustreview.fr/r/{business.slug}</p>
+                      <p className="text-sm text-muted-foreground">{getPublicUrlForPath(`/r/${business.slug}`).replace('https://', '').replace('http://', '')}</p>
                       
                       <div className="flex items-center gap-2 mt-1">
                         <span className={`text-xs px-2 py-1 rounded-full ${
