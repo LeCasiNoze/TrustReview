@@ -14,42 +14,11 @@ export async function GET(request: NextRequest) {
     const supabase = await getSupabaseForIdentity(identity);
     const userId = identity.userId;
 
-    // Si session temporaire, récupérer les vrais QR codes avec UUID déterministe
-    if (identity.isTempSession) {
-      console.log("🔍 [QR-CODES-DEBUG] Session temporaire:", {
-        email: identity.email,
-        userId: userId,
-        clientType: "createSupabaseServiceClient()"
-      });
-      
-      // Get business for the user
-      const { data: business } = await supabase
-        .from('businesses')
-        .select('id')
-        .eq('owner_user_id', userId)
-        .single()
-      
-      if (!business) {
-        console.log("🔍 [QR-CODES-DEBUG] Aucune entreprise trouvée pour session temporaire");
-        return NextResponse.json({ qrCodes: [] });
-      }
-      
-      console.log("🔍 [QR-CODES-DEBUG] Entreprise trouvée pour session temporaire:", business.id);
-      
-      // Get QR codes for the business
-      const { data: qrCodes, error } = await supabase
-        .from('qr_codes')
-        .select('*')
-        .eq('business_id', business.id)
-        .order('created_at', { ascending: false })
-      
-      if (error) {
-        console.error("🔍 [QR-CODES-DEBUG] Erreur récupération QR codes:", error);
-        return NextResponse.json({ qrCodes: [] });
-      }
-      
-      console.log("🔍 [QR-CODES-DEBUG] QR codes trouvés:", qrCodes?.length || 0);
-      return NextResponse.json({ qrCodes: qrCodes || [] });
+    // Si session temporaire, retourner des données factices (plus utilisé)
+    // Cette logique est conservée pour compatibilité mais ne sera plus exécutée
+    if (false) { // Désactivé - plus de sessions temporaires
+      console.log("🔍 [QR-CODES-DEBUG] Ancienne logique temporaire désactivée");
+      return NextResponse.json({ qrCodes: [] });
     }
 
     // Utiliser la source de vérité unique : entreprise active
@@ -90,18 +59,12 @@ export async function POST(request: NextRequest) {
       isAuthenticated: identity.isAuthenticated,
       userId: identity.userId,
       email: identity.email,
-      isTempSession: identity.isTempSession,
       source: identity.source
     });
     
     if (!identity.isAuthenticated || !identity.userId) {
       console.log("🔍 [QR-CODES-POST-DEBUG] REJECT: Unauthorized - no identity");
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    if (identity.isTempSession) {
-      console.log("🔍 [QR-CODES-POST-DEBUG] REJECT: 403 - temp session not allowed");
-      return NextResponse.json({ error: 'Action not available for temporary sessions' }, { status: 403 });
     }
 
     const supabase = await getSupabaseForIdentity(identity);

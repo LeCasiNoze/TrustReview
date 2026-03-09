@@ -17,13 +17,11 @@ export async function getActiveBusiness(identity?: RequestIdentity): Promise<any
     return null;
   }
 
-  const supabase = auth.isTempSession
-    ? await createSupabaseServiceClient()
-    : auth.supabase ?? await createSupabaseServer();
+  const supabase = auth.supabase ?? await createSupabaseServer();
   const userId = auth.userId;
 
   console.log("🔍 [ACTIVE-BUSINESS] Recherche entreprise active:", {
-    sessionType: auth.isTempSession ? "TEMPORARY" : "SUPABASE",
+    sessionType: "SUPABASE",
     userId: userId
   });
 
@@ -55,13 +53,11 @@ export async function setActiveBusiness(businessId: string, identity?: RequestId
     throw new Error("Unauthorized");
   }
 
-  const supabase = auth.isTempSession
-    ? await createSupabaseServiceClient()
-    : auth.supabase ?? await createSupabaseServer();
+  const supabase = auth.supabase ?? await createSupabaseServer();
   const userId = auth.userId;
 
   console.log("🔍 [ACTIVE-BUSINESS] Activation entreprise:", {
-    sessionType: auth.isTempSession ? "TEMPORARY" : "SUPABASE",
+    sessionType: "SUPABASE",
     userId: userId,
     businessId: businessId
   });
@@ -102,10 +98,11 @@ export async function setActiveBusiness(businessId: string, identity?: RequestId
  * Définit la première entreprise comme active (pour la création)
  */
 export async function setFirstBusinessAsActive(userId: string, isTempSession: boolean = false): Promise<void> {
-  const supabase = isTempSession ? await createSupabaseServiceClient() : await createSupabaseServer();
+  // Plus de sessions temporaires - isTempSession ignoré
+  const supabase = await createSupabaseServer();
 
   console.log("🔍 [ACTIVE-BUSINESS] Activation première entreprise:", {
-    sessionType: isTempSession ? "TEMPORARY" : "SUPABASE",
+    sessionType: "SUPABASE",
     userId: userId
   });
 
@@ -145,7 +142,8 @@ export async function setFirstBusinessAsActive(userId: string, isTempSession: bo
  * Migration : Nettoie les entreprises actives multiples
  */
 export async function cleanupMultipleActiveBusinesses(userId: string, isTempSession: boolean = false): Promise<void> {
-  const supabase = isTempSession ? await createSupabaseServiceClient() : await createSupabaseServer();
+  // Plus de sessions temporaires - isTempSession ignoré
+  const supabase = await createSupabaseServer();
 
   console.log("🔍 [ACTIVE-BUSINESS] Nettoyage entreprises actives multiples:", userId);
 

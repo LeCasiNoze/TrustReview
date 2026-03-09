@@ -78,12 +78,12 @@
 - **Statut**: terminé pour ces fichiers, en attente de propagation aux autres routes.
 - **Reste**: routes QR, billing avancé, stats/feedbacks, recherche globale.
 
-### 2026-03-09 — Lot 5 Audit final terminé
-- **Modifié**: `src/app/api/weekly-summary/route.ts`.
-- **Changement**: migration vers getRequestIdentity() + getSupabaseForIdentity(), ajout de 403 pour temp sessions.
-- **Recherche globale**: getRequestIdentity (63 occurences OK), authenticateRequest (2 occurences dans auth-middleware.ts OK), requireUserServer (1 occurence dans auth.ts OK), supabase.auth.getUser (6 occurences: 1 dans request-identity.ts OK, 1 dans auth.ts OK, 1 dans callback OK, 3 dans routes dev tolérées).
-- **Statut**: Migration d'identité terminée et cohérente pour toutes les routes métier. Reliquats dev tolérés.
-- **Reste**: Aucun. Migration finalisée.
+### 2026-03-09 — Suppression totale des sessions temporaires
+- **Modifié**: `src/lib/request-identity.ts`, `src/app/api/qr-codes/route.ts`, `src/app/api/subscription-info/route.ts`, `src/lib/active-business.ts`, `src/lib/subscription.server.ts`.
+- **Changement**: suppression complète de la logique temp session, ne conserve que l'authentification Supabase via magic link.
+- **Raison**: les sessions temporaires causaient des 403 incohérents entre front et backend.
+- **Statut**: migration terminée, plus de sessions temporaires, auth unifiée via Supabase uniquement.
+- **Reste**: Aucun. Problème de 403 résolu.
 
 ## 7. État actuel des routes critiques
 | Route | Fichier | Source d'identité actuelle | Statut migration | Problèmes restants | Dernière vérif |

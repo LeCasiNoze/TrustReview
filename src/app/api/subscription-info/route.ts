@@ -14,25 +14,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (identity.isTempSession) {
-      return NextResponse.json({
-        canAccess: true,
-        subscriptionStatus: "trialing",
-        plan: {
-          slug: "starter",
-          name: "Starter",
-          max_qr_codes: 5,
-          max_businesses: 1,
-        },
-        canCreateQR: true,
-        canCreateBusiness: true,
-        remainingQRCodes: 5,
-        remainingBusinesses: 1,
-        isTrialActive: true,
-        trialDaysLeft: 7,
-      });
-    }
-
+    // Plus de sessions temporaires - uniquement Supabase
     const subscriptionInfo = await getUserSubscriptionInfoServer();
     
     if (!subscriptionInfo) {

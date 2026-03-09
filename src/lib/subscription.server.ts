@@ -13,10 +13,7 @@ export async function getUserSubscriptionInfoServer(identity?: RequestIdentity):
     return null;
   }
 
-  if (resolvedIdentity.isTempSession) {
-    return null;
-  }
-
+  // Plus de sessions temporaires - uniquement Supabase
   const supabase = resolvedIdentity.supabase ?? await getSupabaseForIdentity(resolvedIdentity);
   const userId = resolvedIdentity.userId;
 
