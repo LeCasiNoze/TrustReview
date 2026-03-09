@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServer } from "@/lib/supabase-server";
-import { authenticateRequest } from "@/lib/auth-middleware";
+import { getRequestIdentity, getSupabaseForIdentity } from "@/lib/request-identity";
 
 export async function POST(req: Request) {
   try {
-    const auth = await authenticateRequest();
+    const identity = await getRequestIdentity();
     
-    if (!auth.isAuthenticated) {
+    if (!identity.isAuthenticated || !identity.userId) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
@@ -17,7 +16,7 @@ export async function POST(req: Request) {
     }
 
     // Pour les sessions temporaires, retourner une réponse factice
-    if (auth.isTempSession) {
+    if (identity.isTempSession) {
       return NextResponse.json({
         success: true,
         message: "Plan offert activé",
@@ -32,12 +31,7 @@ export async function POST(req: Request) {
     }
 
     // Pour les sessions Supabase, mettre à jour l'abonnement
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
-    }
+    const supabase = await getSupabaseForIdentity(identity);
 
     // Récupérer le plan offert
     const { data: freePlan } = await supabase
@@ -54,7 +48,7 @@ export async function POST(req: Request) {
     const { data: existingSubscription } = await supabase
       .from('subscriptions')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', identity.userId)
       .single();
 
     // Créer ou mettre à jour l'abonnement
@@ -74,7 +68,7 @@ export async function POST(req: Request) {
       : await supabase
           .from('subscriptions')
           .insert({
-            user_id: user.id,
+            user_id: identity.userId,
             plan_id: freePlan.id,
             status: 'active',
             trial_end: null,

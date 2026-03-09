@@ -36,7 +36,7 @@
 ## 5. Lots de travail
 - [x] **Lot 1 — QR routes** *(TERMINÉ — toutes routes QR migrées)*
 - [x] **Lot 2 — Business routes** *(TERMINÉ — toutes routes business migrées)*
-- [ ] **Lot 3 — Billing / Subscription** *(PARTIEL — billing route + subscription-info migrés, switch-plan/start-trial/stripe/create-* restants)*
+- [x] **Lot 3 — Billing / Subscription** *(TERMINÉ — toutes routes billing/subscription migrées)*
 - [ ] **Lot 4 — Routes secondaires dépendantes du compte** *(NON TRAITÉ — stats, feedbacks, weekly-summary, dev tools, etc.)*
 - [ ] **Lot 5 — Audit final / recherche globale / E2E / commit final** *(NON DÉMARRÉ)*
 
@@ -78,11 +78,11 @@
 - **Statut**: terminé pour ces fichiers, en attente de propagation aux autres routes.
 - **Reste**: routes QR, billing avancé, stats/feedbacks, recherche globale.
 
-### 2026-03-09 — Lot Business finalisé (google-url migré)
-- **Modifié**: `src/app/api/business/google-url/route.ts`.
-- **Changement**: migration vers getRequestIdentity() + getSupabaseForIdentity(), ajout de 403 pour temp sessions, renforcement ownership sur update.
-- **Statut**: Lot 2 Business routes terminé (toutes routes business utilisent getRequestIdentity()).
-- **Reste**: passer aux lots suivants (Billing avancé, stats/feedbacks, audit final).
+### 2026-03-09 — Lot Billing/Subscription finalisé (start-trial & switch-plan migrés)
+- **Modifié**: `src/app/api/billing/start-trial/route.ts`, `src/app/api/billing/switch-plan/route.ts`.
+- **Changement**: migration vers getRequestIdentity() + getSupabaseForIdentity(), suppression de authenticateRequest et supabase.auth.getUser directs, alignement sur identity.userId.
+- **Statut**: Lot 3 Billing/Subscription terminé (subscription-info, billing, start-trial, switch-plan tous migrés).
+- **Reste**: passer aux lots suivants (stats/feedbacks, audit final).
 
 ## 7. État actuel des routes critiques
 | Route | Fichier | Source d'identité actuelle | Statut migration | Problèmes restants | Dernière vérif |
@@ -98,8 +98,8 @@
 | `/api/qr-color-presets` | `src/app/api/qr-color-presets/route.ts` | `getRequestIdentity()` | ✅ Terminé | Aucun | 2026-03-09 |
 | `/api/subscription-info` | `src/app/api/subscription-info/route.ts` | `getRequestIdentity()` | ✅ Terminé | Aucun | 2026-03-08 |
 | `/api/billing` | `src/app/api/billing/route.ts` | `getRequestIdentity()` | ✅ Terminé | - | 2026-03-08 |
-| `/api/billing/start-trial` | `src/app/api/billing/start-trial/route.ts` | `authenticateRequest` + `supabase.auth.getUser` | ❌ Non migré | Uniformiser statut 401/403/404 | 2026-03-09 |
-| `/api/billing/switch-plan` | `src/app/api/billing/switch-plan/route.ts` | `authenticateRequest` + `supabase.auth.getUser` | ❌ Non migré | Même identité que business/QR | 2026-03-09 |
+| `/api/billing/start-trial` | `src/app/api/billing/start-trial/route.ts` | `getRequestIdentity()` | ✅ Terminé | Aucun | 2026-03-09 |
+| `/api/billing/switch-plan` | `src/app/api/billing/switch-plan/route.ts` | `getRequestIdentity()` | ✅ Terminé | Aucun | 2026-03-09 |
 | `/api/stripe/create-*` | `src/app/api/stripe/*.ts` | `authenticateRequest` + `supabase.auth.getUser` | ❌ Non migré | Gérer temp session et statuts | 2026-03-09 |
 | `/api/stats` | `src/app/api/stats/route.ts` | `authenticateRequest` + `supabase.auth.getUser` | ❌ Non migré | Lot 4 | 2026-03-09 |
 | `/api/feedbacks` | `src/app/api/feedbacks/route.ts` | `authenticateRequest` + `supabase.auth.getUser` | ❌ Non migré | Lot 4 | 2026-03-09 |

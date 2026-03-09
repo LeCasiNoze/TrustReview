@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServer } from "@/lib/supabase-server";
-import { authenticateRequest } from "@/lib/auth-middleware";
+import { getRequestIdentity, getSupabaseForIdentity } from "@/lib/request-identity";
 
 export async function POST(req: Request) {
   try {
-    const auth = await authenticateRequest();
+    const identity = await getRequestIdentity();
     
-    if (!auth.isAuthenticated) {
+    if (!identity.isAuthenticated || !identity.userId) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
@@ -17,7 +16,7 @@ export async function POST(req: Request) {
     }
 
     // Pour les sessions temporaires, créer un trial directement
-    if (auth.isTempSession) {
+    if (identity.isTempSession) {
       const trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       
       return NextResponse.json({
@@ -40,18 +39,13 @@ export async function POST(req: Request) {
     }
 
     // Pour les sessions Supabase, créer le trial en base
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
+    const supabase = await getSupabaseForIdentity(identity);
     
-    if (!user) {
-      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
-    }
-
     // Vérifier si un abonnement existe déjà
     const { data: existingSubscription } = await supabase
       .from('subscriptions')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', identity.userId)
       .single();
 
     if (existingSubscription && existingSubscription.status !== 'none') {
@@ -87,7 +81,7 @@ export async function POST(req: Request) {
       : await supabase
           .from('subscriptions')
           .insert({
-            user_id: user.id,
+            user_id: identity.userId,
             plan_id: proPlan.id,
             status: 'trialing',
             trial_end: trialEnd.toISOString(),
