@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase-server";
-import { authenticateRequest } from "@/lib/auth-middleware";
+import { getRequestIdentity } from "@/lib/request-identity";
 
 export async function GET() {
   try {
-    const auth = await authenticateRequest();
+    const identity = await getRequestIdentity();
     
-    if (!auth.isAuthenticated) {
+    if (!identity.isAuthenticated) {
       return NextResponse.json({
         isAuthenticated: false,
         hasSubscriptionActive: false,
@@ -18,7 +18,7 @@ export async function GET() {
     }
 
     // Session temporaire = créer un trial factice
-    if (auth.isTempSession) {
+    if (identity.isTempSession) {
       const trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       const trialDaysLeft = 7; // Toujours 7 jours pour les sessions temporaires
       return NextResponse.json({
@@ -46,19 +46,8 @@ export async function GET() {
     }
 
     // Authentification Supabase normale
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      return NextResponse.json({
-        isAuthenticated: false,
-        hasSubscriptionActive: false,
-        isTrialActive: false,
-        isTrialAvailable: true,
-        subscriptionStatus: 'none',
-        needsOnboarding: false
-      });
-    }
+    const supabase = identity.supabase ?? await createSupabaseServer();
+    const user = identity.user;
     
     // Récupérer l'abonnement
     const { data: subscription } = await supabase

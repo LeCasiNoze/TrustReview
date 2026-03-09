@@ -4,21 +4,23 @@
  */
 
 import { createSupabaseServer, createSupabaseServiceClient } from "@/lib/supabase-server";
-import { authenticateRequest } from "@/lib/auth-middleware";
-import { getTemporaryUserId } from "@/lib/temp-uuid";
+import type { RequestIdentity } from "@/lib/request-identity";
+import { getRequestIdentity } from "@/lib/request-identity";
 
 /**
  * Récupère l'entreprise active d'un utilisateur
  */
-export async function getActiveBusiness(): Promise<any> {
-  const auth = await authenticateRequest();
+export async function getActiveBusiness(identity?: RequestIdentity): Promise<any> {
+  const auth = identity ?? await getRequestIdentity();
   
-  if (!auth.isAuthenticated) {
+  if (!auth.isAuthenticated || !auth.userId) {
     return null;
   }
 
-  const supabase = auth.isTempSession ? await createSupabaseServiceClient() : await createSupabaseServer();
-  const userId = auth.isTempSession ? getTemporaryUserId(auth.email) : auth.user!.id;
+  const supabase = auth.isTempSession
+    ? await createSupabaseServiceClient()
+    : auth.supabase ?? await createSupabaseServer();
+  const userId = auth.userId;
 
   console.log("🔍 [ACTIVE-BUSINESS] Recherche entreprise active:", {
     sessionType: auth.isTempSession ? "TEMPORARY" : "SUPABASE",
@@ -46,15 +48,17 @@ export async function getActiveBusiness(): Promise<any> {
  * Définit une entreprise comme active (UNIQUE)
  * Désactive toutes les autres entreprises du même utilisateur
  */
-export async function setActiveBusiness(businessId: string): Promise<void> {
-  const auth = await authenticateRequest();
+export async function setActiveBusiness(businessId: string, identity?: RequestIdentity): Promise<void> {
+  const auth = identity ?? await getRequestIdentity();
   
-  if (!auth.isAuthenticated) {
+  if (!auth.isAuthenticated || !auth.userId) {
     throw new Error("Unauthorized");
   }
 
-  const supabase = auth.isTempSession ? await createSupabaseServiceClient() : await createSupabaseServer();
-  const userId = auth.isTempSession ? getTemporaryUserId(auth.email) : auth.user!.id;
+  const supabase = auth.isTempSession
+    ? await createSupabaseServiceClient()
+    : auth.supabase ?? await createSupabaseServer();
+  const userId = auth.userId;
 
   console.log("🔍 [ACTIVE-BUSINESS] Activation entreprise:", {
     sessionType: auth.isTempSession ? "TEMPORARY" : "SUPABASE",

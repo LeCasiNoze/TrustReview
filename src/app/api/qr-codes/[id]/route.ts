@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseServer } from '@/lib/supabase-server'
-import { requireUserServer } from '@/lib/auth'
+import { getRequestIdentity, getSupabaseForIdentity } from '@/lib/request-identity'
 
 export async function PUT(
   request: NextRequest,
@@ -9,8 +8,17 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const user = await requireUserServer();
-    const supabase = await createSupabaseServer();
+    const identity = await getRequestIdentity();
+
+    if (!identity.isAuthenticated || !identity.userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (identity.isTempSession) {
+      return NextResponse.json({ error: 'Action not available for temporary sessions' }, { status: 403 });
+    }
+
+    const supabase = await getSupabaseForIdentity(identity);
     
     // Get the QR code to verify ownership
     const { data: qrCode, error: fetchError } = await supabase
@@ -28,11 +36,11 @@ export async function PUT(
       .from('businesses')
       .select('id')
       .eq('id', qrCode.business_id)
-      .eq('owner_user_id', user.id)
+      .eq('owner_user_id', identity.userId)
       .single();
     
     if (!business) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     
     // Prepare update data
@@ -72,8 +80,17 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const user = await requireUserServer();
-    const supabase = await createSupabaseServer();
+    const identity = await getRequestIdentity();
+
+    if (!identity.isAuthenticated || !identity.userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (identity.isTempSession) {
+      return NextResponse.json({ error: 'Action not available for temporary sessions' }, { status: 403 });
+    }
+
+    const supabase = await getSupabaseForIdentity(identity);
     
     // Get the QR code with business to verify ownership
     const { data: qrCode, error: fetchError } = await supabase
@@ -91,11 +108,11 @@ export async function DELETE(
       .from('businesses')
       .select('id')
       .eq('id', qrCode.business_id)
-      .eq('owner_user_id', user.id)
+      .eq('owner_user_id', identity.userId)
       .single();
     
     if (!business) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     
     // Delete QR code

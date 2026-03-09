@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
-import { getQRColorPresets } from "@/lib/subscription";
-import { getUserSubscriptionInfoServer } from "@/lib/subscription.server";
+import { getRequestIdentity } from "@/lib/request-identity";
+import { getQRColorPresetsServer, getUserSubscriptionInfoServer } from "@/lib/subscription.server";
 
 export async function GET() {
   try {
+    const identity = await getRequestIdentity();
+
+    if (!identity.isAuthenticated || !identity.userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const [presets, subscriptionInfo] = await Promise.all([
-      getQRColorPresets(),
-      getUserSubscriptionInfoServer()
+      getQRColorPresetsServer(identity),
+      getUserSubscriptionInfoServer(identity)
     ]);
 
     // Filtrer les presets selon le plan

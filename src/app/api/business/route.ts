@@ -1,11 +1,17 @@
 import { createSupabaseServer } from '@/lib/supabase-server'
-import { requireUserServer } from '@/lib/auth'
+import { getRequestIdentity, getSupabaseForIdentity } from '@/lib/request-identity'
+import { NextResponse } from 'next/server'
 import { redirect } from 'next/navigation'
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUserServer()
-    const supabase = await createSupabaseServer()
+    const identity = await getRequestIdentity()
+    
+    if (!identity.isAuthenticated || !identity.userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
+    const supabase = await getSupabaseForIdentity(identity)
     
     const formData = await request.formData()
     
@@ -18,7 +24,7 @@ export async function POST(request: Request) {
       logo_url: formData.get('logo_url') as string,
       notif_new_review: formData.get('notif_new_review') === 'true',
       notif_low_rating: formData.get('notif_low_rating') === 'true',
-      owner_user_id: user.id,
+      owner_user_id: identity.userId,
       updated_at: new Date().toISOString()
     }
 
@@ -26,7 +32,7 @@ export async function POST(request: Request) {
     const { data: existingBusiness } = await supabase
       .from('businesses')
       .select('id')
-      .eq('owner_user_id', user.id)
+      .eq('owner_user_id', identity.userId)
       .single()
 
     let result
@@ -36,6 +42,7 @@ export async function POST(request: Request) {
         .from('businesses')
         .update(businessData)
         .eq('id', existingBusiness.id)
+        .eq('owner_user_id', identity.userId)
     } else {
       // Create new business
       result = await supabase
@@ -54,7 +61,7 @@ export async function POST(request: Request) {
     redirect('/app/business')
   } catch (error) {
     if (error instanceof Error && error.message.includes('User not found')) {
-      return new Response('Unauthorized', { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     throw error
   }

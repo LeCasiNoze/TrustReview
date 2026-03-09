@@ -3,16 +3,40 @@
  * Utilise subscription.server.ts (non déprécié)
  */
 import { NextResponse } from "next/server";
+import { getRequestIdentity } from "@/lib/request-identity";
 import { getUserSubscriptionInfoServer } from "@/lib/subscription.server";
 
 export async function GET() {
   try {
+    const identity = await getRequestIdentity();
+
+    if (!identity.isAuthenticated) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (identity.isTempSession) {
+      return NextResponse.json({
+        canAccess: true,
+        subscriptionStatus: "trialing",
+        plan: {
+          slug: "starter",
+          name: "Starter",
+          max_qr_codes: 5,
+          max_businesses: 1,
+        },
+        canCreateQR: true,
+        canCreateBusiness: true,
+        remainingQRCodes: 5,
+        remainingBusinesses: 1,
+        isTrialActive: true,
+        trialDaysLeft: 7,
+      });
+    }
+
     const subscriptionInfo = await getUserSubscriptionInfoServer();
     
     if (!subscriptionInfo) {
-      return NextResponse.json({ 
-        error: "User not found" 
-      }, { status: 404 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const planData = subscriptionInfo.plan ? {

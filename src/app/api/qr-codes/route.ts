@@ -1,27 +1,23 @@
-import { createSupabaseServer, createSupabaseServiceClient } from '@/lib/supabase-server'
-import { requireUserServer } from '@/lib/auth'
-import { redirect } from 'next/navigation'
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from "@/lib/auth-middleware";
-import { getTemporaryUserId } from "@/lib/temp-uuid";
+import { getRequestIdentity, getSupabaseForIdentity } from "@/lib/request-identity";
 import { getPlanQuotas, getQuotaLimitMessage } from "@/lib/quotas";
 import { getActiveBusiness } from "@/lib/active-business";
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await authenticateRequest();
+    const identity = await getRequestIdentity();
     
-    if (!auth.isAuthenticated) {
+    if (!identity.isAuthenticated || !identity.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const supabase = await getSupabaseForIdentity(identity);
+    const userId = identity.userId;
+
     // Si session temporaire, récupérer les vrais QR codes avec UUID déterministe
-    if (auth.isTempSession) {
-      const supabase = await createSupabaseServiceClient();
-      const userId = getTemporaryUserId(auth.email);
-      
+    if (identity.isTempSession) {
       console.log("🔍 [QR-CODES-DEBUG] Session temporaire:", {
-        email: auth.email,
+        email: identity.email,
         userId: userId,
         clientType: "createSupabaseServiceClient()"
       });
@@ -56,12 +52,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ qrCodes: qrCodes || [] });
     }
 
-    // Authentification Supabase normale
-    const user = await requireUserServer()
-    const supabase = await createSupabaseServer()
-    
     // Utiliser la source de vérité unique : entreprise active
-    const activeBusiness = await getActiveBusiness();
+    const activeBusiness = await getActiveBusiness(identity);
     
     if (!activeBusiness) {
       console.log("🔍 [QR-CODES-GET] Aucune entreprise active trouvée");
@@ -86,26 +78,32 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json({ qrCodes })
   } catch (error) {
-    if (error instanceof Error && error.message.includes('User not found')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireUserServer()
-    const supabase = await createSupabaseServer()
+    const identity = await getRequestIdentity();
+    
+    if (!identity.isAuthenticated || !identity.userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (identity.isTempSession) {
+      return NextResponse.json({ error: 'Action not available for temporary sessions' }, { status: 403 });
+    }
+
+    const supabase = await getSupabaseForIdentity(identity);
     
     const formData = await request.formData()
     
     // Utiliser la source de vérité unique : entreprise active
-    const activeBusiness = await getActiveBusiness();
+    const activeBusiness = await getActiveBusiness(identity);
     
     if (!activeBusiness) {
       console.log("🔍 [QR-CODES-POST] Aucune entreprise active trouvée");
-      return NextResponse.json({ error: 'No active business found' }, { status: 404 });
+      return NextResponse.json({ error: 'No active business found' }, { status: 400 });
     }
     
     console.log("🔍 [QR-CODES-POST] Utilisation entreprise active:", {
@@ -119,12 +117,6 @@ export async function POST(request: NextRequest) {
       .select('id')
       .eq('business_id', activeBusiness.id)
     
-    // Get user's subscription info to check quotas
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    if (!authUser) {
-      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
-    }
-    
     // Get subscription plan
     const { data: subscription } = await supabase
       .from('subscriptions')
@@ -132,7 +124,7 @@ export async function POST(request: NextRequest) {
         *,
         plan:subscription_plans(slug, max_qr_codes)
       `)
-      .eq('user_id', authUser.id)
+      .eq('user_id', identity.userId)
       .single();
     
     // Utiliser la source de vérité unique pour les quotas

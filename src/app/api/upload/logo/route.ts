@@ -1,11 +1,15 @@
-import { createSupabaseServer } from '@/lib/supabase-server'
-import { requireUserServer } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
+import { getRequestIdentity, getSupabaseForIdentity } from '@/lib/request-identity'
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireUserServer()
-    const supabase = await createSupabaseServer()
+    const identity = await getRequestIdentity()
+    
+    if (!identity.isAuthenticated || !identity.userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
+    const supabase = await getSupabaseForIdentity(identity)
     
     const formData = await request.formData()
     const file = formData.get('file') as File
@@ -27,7 +31,7 @@ export async function POST(request: NextRequest) {
     
     // Generate unique filename
     const fileExt = file.name.split('.').pop()
-    const fileName = `${user.id}/logo-${Date.now()}.${fileExt}`
+    const fileName = `${identity.userId}/logo-${Date.now()}.${fileExt}`
     
     // Upload to Supabase Storage
     console.log('Uploading logo:', { fileName, fileSize: file.size, fileType: file.type })
@@ -64,8 +68,8 @@ export async function POST(request: NextRequest) {
     
   } catch (error) {
     console.error('Logo upload error:', error)
-    if (error instanceof Error && error.message.includes('User not found')) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+    if (error instanceof Error && error.message.includes('Unauthorized')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     return NextResponse.json({ error: 'Erreur lors de l\'upload' }, { status: 500 })
   }

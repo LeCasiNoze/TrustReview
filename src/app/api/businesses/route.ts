@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServer } from "@/lib/supabase-server";
+import { getRequestIdentity } from "@/lib/request-identity";
 import { createBusiness, getUserBusinesses } from "@/lib/business-manager";
 
 export async function GET() {
   try {
-    const businessManager = await getUserBusinesses();
+    const identity = await getRequestIdentity();
+
+    if (!identity.isAuthenticated) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const businessManager = await getUserBusinesses(identity);
     return NextResponse.json(businessManager);
   } catch (error) {
     console.error('Error fetching businesses:', error);
@@ -14,12 +20,18 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const identity = await getRequestIdentity();
+    
+    if (!identity.isAuthenticated) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
     console.log("🏢 [BUSINESSES] Création entreprise demandée:", body);
     
     // Vérifier les limites d'abonnement avant création
     console.log("🏢 [BUSINESSES] Vérification quotas...");
-    const businessManager = await getUserBusinesses();
+    const businessManager = await getUserBusinesses(identity);
     console.log("🏢 [BUSINESSES] Business manager:", {
       businessesCount: businessManager.businesses.length,
       canCreateMore: businessManager.canCreateMore,
@@ -34,7 +46,7 @@ export async function POST(req: Request) {
     }
 
     console.log("🏢 [BUSINESSES] Création entreprise autorisée...");
-    const business = await createBusiness(body);
+    const business = await createBusiness(body, identity);
     console.log("🏢 [BUSINESSES] Entreprise créée avec succès:", business.id);
     
     return NextResponse.json({ 

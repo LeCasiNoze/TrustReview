@@ -1,54 +1,18 @@
-import { createSupabaseServer } from "@/lib/supabase-server";
-import { getTempSession } from "@/lib/temp-auth";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getRequestIdentity } from "@/lib/request-identity";
 
 export interface AuthContext {
   user: any;
   email: string;
+  userId: string | null;
   isTempSession: boolean;
   isAuthenticated: boolean;
+  source: "supabase" | "temp" | "none";
+  supabase?: SupabaseClient<any, any, any> | null;
 }
 
 export async function authenticateRequest(): Promise<AuthContext> {
-  // Essayer l'authentification Supabase d'abord
-  try {
-    const supabase = await createSupabaseServer();
-    const { data: { user }, error } = await supabase.auth.getUser();
-    
-    if (!error && user) {
-      return {
-        user,
-        email: user.email || '',
-        isTempSession: false,
-        isAuthenticated: true
-      };
-    }
-  } catch (error) {
-    console.log("Supabase auth failed, trying temp session");
-  }
-
-  // Essayer la session temporaire
-  try {
-    const tempSession = await getTempSession();
-    
-    if (tempSession && tempSession.verified) {
-      return {
-        user: null, // Pas d'utilisateur Supabase
-        email: tempSession.email,
-        isTempSession: true,
-        isAuthenticated: true
-      };
-    }
-  } catch (error) {
-    console.log("Temp session check failed");
-  }
-
-  // Aucune authentification
-  return {
-    user: null,
-    email: '',
-    isTempSession: false,
-    isAuthenticated: false
-  };
+  return getRequestIdentity();
 }
 
 export async function requireAuth(): Promise<AuthContext> {

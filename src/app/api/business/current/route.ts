@@ -1,22 +1,19 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServer, createSupabaseServiceClient } from "@/lib/supabase-server";
-import { authenticateRequest } from "@/lib/auth-middleware";
-import { getTemporaryUserId } from "@/lib/temp-uuid";
+import { getRequestIdentity } from "@/lib/request-identity";
 import { getActiveBusiness } from "@/lib/active-business";
 
 export async function GET() {
   try {
-    // Vérifier l'authentification (Supabase ou temporaire)
-    const auth = await authenticateRequest();
+    const identity = await getRequestIdentity();
     
-    if (!auth.isAuthenticated) {
+    if (!identity.isAuthenticated) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    console.log("Business API - Authenticated:", { email: auth.email, isTemp: auth.isTempSession });
+    console.log("Business API - Authenticated:", { email: identity.email, isTemp: identity.isTempSession });
 
     // Utiliser la source de vérité unique pour l'entreprise active
-    const business = await getActiveBusiness();
+    const business = await getActiveBusiness(identity);
 
     if (!business) {
       console.log("🔍 [BUSINESS-CURRENT] Aucune entreprise active trouvée");

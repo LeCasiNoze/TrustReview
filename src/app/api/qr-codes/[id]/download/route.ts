@@ -1,8 +1,7 @@
-import { createSupabaseServer } from '@/lib/supabase-server'
-import { requireUserServer } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import QRCode from 'qrcode'
 import sharp from 'sharp'
+import { getRequestIdentity, getSupabaseForIdentity } from '@/lib/request-identity'
 
 export async function GET(
   request: NextRequest,
@@ -10,8 +9,17 @@ export async function GET(
 ) {
   const { id } = await params
   try {
-    const user = await requireUserServer()
-    const supabase = await createSupabaseServer()
+    const identity = await getRequestIdentity()
+
+    if (!identity.isAuthenticated || !identity.userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (identity.isTempSession) {
+      return NextResponse.json({ error: 'Action not available for temporary sessions' }, { status: 403 })
+    }
+
+    const supabase = await getSupabaseForIdentity(identity)
     
     // Get QR code with business info
     const { data: qrCode, error } = await supabase
@@ -41,8 +49,8 @@ export async function GET(
       .eq('id', qrCode.business_id)
       .single()
     
-    if (!business || business.owner_user_id !== user.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!business || business.owner_user_id !== identity.userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
     
     // Generate QR code URL

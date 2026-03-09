@@ -1,7 +1,7 @@
 import { createSupabaseServer, createSupabaseServiceClient } from "@/lib/supabase-server";
-import { authenticateRequest } from "@/lib/auth-middleware";
+import type { RequestIdentity } from "@/lib/request-identity";
+import { getRequestIdentity } from "@/lib/request-identity";
 import { getTemporaryUserId } from "@/lib/temp-uuid";
-import { randomUUID } from 'crypto';
 import { getPlanQuotas, calculateRemainingQuotas } from "@/lib/quotas";
 import { setFirstBusinessAsActive } from "@/lib/active-business";
 
@@ -26,11 +26,10 @@ export interface BusinessManager {
   remainingSlots: number | null;
 }
 
-export async function getUserBusinesses(): Promise<BusinessManager> {
+export async function getUserBusinesses(identity?: RequestIdentity): Promise<BusinessManager> {
   console.log("🏢 [BUSINESS-MANAGER] getUserBusinesses appelé");
   
-  // Utiliser le middleware d'authentification qui gère les sessions temporaires
-  const auth = await authenticateRequest();
+  const auth = identity ?? await getRequestIdentity();
   console.log("🏢 [BUSINESS-MANAGER] Auth result:", {
     isAuthenticated: auth.isAuthenticated,
     isTempSession: auth.isTempSession,
@@ -43,7 +42,9 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
   }
 
   // Utiliser le client approprié selon le type d'authentification
-  const supabase = auth.isTempSession ? await createSupabaseServiceClient() : await createSupabaseServer();
+  const supabase = auth.isTempSession
+    ? await createSupabaseServiceClient()
+    : auth.supabase ?? await createSupabaseServer();
 
   // Récupérer les infos d'abonnement pour vérifier les limites
   // Utiliser la logique côté serveur directement
@@ -62,7 +63,7 @@ export async function getUserBusinesses(): Promise<BusinessManager> {
     // Pour les sessions temporaires, générer un UUID déterministe via helper partagé
     userId = getTemporaryUserId(auth.email);
   } else {
-    userId = auth.user.id;
+    userId = auth.userId!;
     console.log("🏢 [BUSINESS-MANAGER] Récupération abonnement pour user:", userId);
     const result = await supabase
       .from('subscriptions')
@@ -186,9 +187,8 @@ export async function setActiveBusiness(businessId: string): Promise<void> {
   }
 }
 
-export async function createBusiness(businessData: Partial<Business>): Promise<Business> {
-  // Utiliser le middleware d'authentification
-  const auth = await authenticateRequest();
+export async function createBusiness(businessData: Partial<Business>, identity?: RequestIdentity): Promise<Business> {
+  const auth = identity ?? await getRequestIdentity();
   
   // LOGS DIAGNOSTIC - Étape 1: Type de session
   console.log("🔍 [DIAG] Session type detected:", {
@@ -204,7 +204,7 @@ export async function createBusiness(businessData: Partial<Business>): Promise<B
   }
 
   // Vérifier les limites d'abonnement
-  const businessManager = await getUserBusinesses();
+  const businessManager = await getUserBusinesses(auth);
   if (!businessManager.canCreateMore) {
     throw new Error(`Limite d'entreprises atteinte (${businessManager.businesses.length}/${businessManager.remainingSlots === null ? '∞' : businessManager.businesses.length + businessManager.remainingSlots})`);
   }
@@ -228,7 +228,7 @@ export async function createBusiness(businessData: Partial<Business>): Promise<B
     clientType = "createSupabaseServiceClient()";
   } else {
     console.log("🔍 [DIAG] Normal Supabase session, using standard client...");
-    supabase = await createSupabaseServer();
+    supabase = auth.supabase ?? await createSupabaseServer();
     clientType = "createSupabaseServer()";
   }
   
@@ -236,12 +236,7 @@ export async function createBusiness(businessData: Partial<Business>): Promise<B
   
   // Déterminer l'ID utilisateur selon le type d'authentification
   let userId: string;
-  if (auth.isTempSession) {
-    // Pour les sessions temporaires, générer le même UUID déterministe via helper partagé
-    userId = getTemporaryUserId(auth.email);
-  } else {
-    userId = auth.user.id; // Pour les sessions Supabase, stocker l'UUID
-  }
+  userId = auth.isTempSession ? getTemporaryUserId(auth.email) : auth.userId!;
 
   // LOGS DIAGNOSTIC - Étape 4: Juste avant l'insert
   console.log("🔍 [DIAG] PRE-INSERT ANALYSIS:", {
@@ -301,13 +296,16 @@ export async function createBusiness(businessData: Partial<Business>): Promise<B
   return data;
 }
 
-export async function updateBusiness(businessId: string, updates: Partial<Business>): Promise<Business> {
-  const supabase = await createSupabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
+export async function updateBusiness(businessId: string, updates: Partial<Business>, identity?: RequestIdentity): Promise<Business> {
+  const auth = identity ?? await getRequestIdentity();
   
-  if (!user) {
+  if (!auth.isAuthenticated || !auth.userId) {
     throw new Error('User not authenticated');
   }
+  
+  const supabase = auth.isTempSession
+    ? await createSupabaseServiceClient()
+    : auth.supabase ?? await createSupabaseServer();
 
   const { data, error } = await supabase
     .from('businesses')
@@ -316,7 +314,7 @@ export async function updateBusiness(businessId: string, updates: Partial<Busine
       updated_at: new Date().toISOString()
     })
     .eq('id', businessId)
-    .eq('owner_user_id', user.id)
+    .eq('owner_user_id', auth.userId)
     .select()
     .single();
 
@@ -328,20 +326,23 @@ export async function updateBusiness(businessId: string, updates: Partial<Busine
   return data;
 }
 
-export async function deleteBusiness(businessId: string): Promise<void> {
-  const supabase = await createSupabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
+export async function deleteBusiness(businessId: string, identity?: RequestIdentity): Promise<void> {
+  const auth = identity ?? await getRequestIdentity();
   
-  if (!user) {
+  if (!auth.isAuthenticated || !auth.userId) {
     throw new Error('User not authenticated');
   }
+  
+  const supabase = auth.isTempSession
+    ? await createSupabaseServiceClient()
+    : auth.supabase ?? await createSupabaseServer();
 
   // Vérifier que c'est bien l'entreprise de l'utilisateur
   const { data: business } = await supabase
     .from('businesses')
     .select('id')
     .eq('id', businessId)
-    .eq('owner_user_id', user.id)
+    .eq('owner_user_id', auth.userId)
     .single();
 
   if (!business) {
@@ -351,7 +352,8 @@ export async function deleteBusiness(businessId: string): Promise<void> {
   const { error } = await supabase
     .from('businesses')
     .delete()
-    .eq('id', businessId);
+    .eq('id', businessId)
+    .eq('owner_user_id', auth.userId);
 
   if (error) {
     console.error('Error deleting business:', error);

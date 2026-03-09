@@ -1,13 +1,24 @@
 import "server-only";
 import { createSupabaseServer } from "@/lib/supabase-server";
+import type { RequestIdentity } from "@/lib/request-identity";
+import { getRequestIdentity, getSupabaseForIdentity } from "@/lib/request-identity";
 import { Subscription, SubscriptionPlan, UserSubscriptionInfo } from "@/lib/types/subscription";
+import { QRColorPreset } from "@/lib/types/subscription";
 import { calculateRemainingQuotas } from "@/lib/quotas";
 
-export async function getUserSubscriptionInfoServer(): Promise<UserSubscriptionInfo | null> {
-  const supabase = await createSupabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) return null;
+export async function getUserSubscriptionInfoServer(identity?: RequestIdentity): Promise<UserSubscriptionInfo | null> {
+  const resolvedIdentity = identity ?? await getRequestIdentity();
+
+  if (!resolvedIdentity.isAuthenticated || !resolvedIdentity.userId) {
+    return null;
+  }
+
+  if (resolvedIdentity.isTempSession) {
+    return null;
+  }
+
+  const supabase = resolvedIdentity.supabase ?? await getSupabaseForIdentity(resolvedIdentity);
+  const userId = resolvedIdentity.userId;
 
   // Récupérer l'abonnement
   const { data: subscription } = await supabase
@@ -16,7 +27,7 @@ export async function getUserSubscriptionInfoServer(): Promise<UserSubscriptionI
       *,
       plan:subscription_plans(*)
     `)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .single();
 
   // Récupérer le plan
@@ -42,7 +53,7 @@ export async function getUserSubscriptionInfoServer(): Promise<UserSubscriptionI
       const { data: newSubscription } = await supabase
         .from('subscriptions')
         .insert({
-          user_id: user.id,
+          user_id: userId,
           plan_id: starterPlan.id,
           status: 'trialing',
           trial_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 jours
@@ -79,12 +90,12 @@ export async function getUserSubscriptionInfoServer(): Promise<UserSubscriptionI
   const { data: qrCodes } = await supabase
     .from('qr_codes')
     .select('id')
-    .eq('user_id', user.id);
+    .eq('user_id', userId);
 
   const { data: businesses } = await supabase
     .from('businesses')
     .select('id')
-    .eq('user_id', user.id);
+    .eq('user_id', userId);
 
   const qrCount = qrCodes?.length || 0;
   const businessCount = businesses?.length || 0;
@@ -134,4 +145,22 @@ export async function getBillingDataServer() {
   ]);
 
   return { info, plans };
+}
+
+export async function getQRColorPresetsServer(identity?: RequestIdentity): Promise<QRColorPreset[]> {
+  const resolvedIdentity = identity ?? await getRequestIdentity();
+
+  if (!resolvedIdentity.isAuthenticated || !resolvedIdentity.userId) {
+    return [];
+  }
+
+  const supabase = resolvedIdentity.supabase ?? await getSupabaseForIdentity(resolvedIdentity);
+
+  const { data: presets } = await supabase
+    .from('qr_color_presets')
+    .select('*')
+    .eq('is_active', true)
+    .order('sort_order');
+
+  return presets || [];
 }
