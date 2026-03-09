@@ -8,8 +8,9 @@ export async function GET(request: Request) {
   const codeVerified = searchParams.get('code_verified')
   const next = searchParams.get('next') ?? '/app'
 
-  // Cas spécial : login par code vérifié
-  if (codeVerified === 'true' && email) {
+  // Cas spécial : login par code vérifié (uniquement si code_verified = true ET email présent)
+  // Mais ignorer si c'est un magic link Supabase normal (qui a aussi email et code)
+  if (codeVerified === 'true' && email && !code) {
     console.log("🔐 Processing verified code login for:", email);
     
     // Créer une session Supabase pour cet email
@@ -33,6 +34,7 @@ export async function GET(request: Request) {
     redirect(loginUrl)
   }
 
+  // Magic link Supabase normal (prioritaire)
   if (code) {
     const supabase = await createSupabaseServer()
     
