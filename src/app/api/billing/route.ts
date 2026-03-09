@@ -17,35 +17,7 @@ export async function GET() {
       });
     }
 
-    // Session temporaire = créer un trial factice
-    if (identity.isTempSession) {
-      const trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-      const trialDaysLeft = 7; // Toujours 7 jours pour les sessions temporaires
-      return NextResponse.json({
-        isAuthenticated: true,
-        hasSubscriptionActive: true,
-        isTrialActive: true,
-        trialDaysLeft,
-        isTrialAvailable: false,
-        subscriptionStatus: 'trialing',
-        needsOnboarding: false,
-        subscription: {
-          id: 'temp-trial',
-          status: 'trialing',
-          trial_end: trialEnd.toISOString(),
-          created_at: new Date().toISOString()
-        },
-        plan: {
-          id: 'starter',
-          name: 'Essai gratuit',
-          slug: 'starter',
-          max_businesses: 1,
-          max_qr_codes: 5
-        }
-      });
-    }
-
-    // Authentification Supabase normale
+    // Plus de sessions temporaires - uniquement Supabase
     const supabase = identity.supabase ?? await createSupabaseServer();
     const user = identity.user;
     
