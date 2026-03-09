@@ -15,30 +15,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Plan non valide" }, { status: 400 });
     }
 
-    // Pour les sessions temporaires, créer un trial directement
-    if (identity.isTempSession) {
-      const trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-      
-      return NextResponse.json({
-        success: true,
-        message: "Essai gratuit démarré avec succès",
-        trial: {
-          id: 'temp-trial-pro',
-          status: 'trialing',
-          trial_end: trialEnd.toISOString(),
-          created_at: new Date().toISOString()
-        },
-        plan: {
-          id: 'pro',
-          name: 'Pro',
-          slug: 'pro',
-          max_businesses: 3,
-          max_qr_codes: 50
-        }
-      });
-    }
-
-    // Pour les sessions Supabase, créer le trial en base
+    // Plus de sessions temporaires - uniquement Supabase
     const supabase = await getSupabaseForIdentity(identity);
     
     // Vérifier si un abonnement existe déjà
