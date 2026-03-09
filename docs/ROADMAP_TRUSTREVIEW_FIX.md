@@ -35,7 +35,7 @@
 
 ## 5. Lots de travail
 - [x] **Lot 1 — QR routes** *(TERMINÉ — toutes routes QR migrées)*
-- [ ] **Lot 2 — Business routes** *(MAJORITÉ OK — reste google-url + vérif helpers)*
+- [x] **Lot 2 — Business routes** *(TERMINÉ — toutes routes business migrées)*
 - [ ] **Lot 3 — Billing / Subscription** *(PARTIEL — billing route + subscription-info migrés, switch-plan/start-trial/stripe/create-* restants)*
 - [ ] **Lot 4 — Routes secondaires dépendantes du compte** *(NON TRAITÉ — stats, feedbacks, weekly-summary, dev tools, etc.)*
 - [ ] **Lot 5 — Audit final / recherche globale / E2E / commit final** *(NON DÉMARRÉ)*
@@ -78,11 +78,11 @@
 - **Statut**: terminé pour ces fichiers, en attente de propagation aux autres routes.
 - **Reste**: routes QR, billing avancé, stats/feedbacks, recherche globale.
 
-### 2026-03-09 — Lot QR finalisé (download + presets)
-- **Modifié**: `src/app/api/qr-codes/[id]/download/route.ts`, `src/app/api/qr-color-presets/route.ts`, `src/lib/subscription.server.ts`.
-- **Changement**: migration vers getRequestIdentity() pour download et presets, ajout de getQRColorPresetsServer(), suppression de getQRColorPresets() deprecated usage.
-- **Statut**: Lot 1 QR routes terminé (GET/POST/PUT/DELETE/download/presets tous migrés).
-- **Reste**: passer aux lots suivants (Business google-url, Billing avancé, stats/feedbacks, audit final).
+### 2026-03-09 — Lot Business finalisé (google-url migré)
+- **Modifié**: `src/app/api/business/google-url/route.ts`.
+- **Changement**: migration vers getRequestIdentity() + getSupabaseForIdentity(), ajout de 403 pour temp sessions, renforcement ownership sur update.
+- **Statut**: Lot 2 Business routes terminé (toutes routes business utilisent getRequestIdentity()).
+- **Reste**: passer aux lots suivants (Billing avancé, stats/feedbacks, audit final).
 
 ## 7. État actuel des routes critiques
 | Route | Fichier | Source d'identité actuelle | Statut migration | Problèmes restants | Dernière vérif |
@@ -91,7 +91,7 @@
 | `/api/businesses` | `src/app/api/businesses/route.ts` | `getRequestIdentity()` | ✅ Terminé | Vérifier encore quotas après lot final | 2026-03-08 |
 | `/api/businesses/user` | `src/app/api/businesses/user/route.ts` | `getRequestIdentity()` | ✅ Terminé | Suivi active business ok | 2026-03-08 |
 | `/api/business` | `src/app/api/business/route.ts` | `getRequestIdentity()` | ✅ Terminé | - | 2026-03-08 |
-| `/api/business/google-url` | `src/app/api/business/google-url/route.ts` | `requireUserServer` | ⏳ À migrer (Lot 2) | Migration vers identité unifiée | 2026-03-09 |
+| `/api/business/google-url` | `src/app/api/business/google-url/route.ts` | `getRequestIdentity()` | ✅ Terminé | Aucun | 2026-03-09 |
 | `/api/qr-codes` | `src/app/api/qr-codes/route.ts` | `getRequestIdentity()` | ✅ GET/POST ok | Aucun pour ces handlers | 2026-03-09 |
 | `/api/qr-codes/[id]` | `src/app/api/qr-codes/[id]/route.ts` | `getRequestIdentity()` | ⏳ PUT/DELETE migrés mais à revérifier | Vérifier réponses JSON & logs | 2026-03-09 |
 | `/api/qr-codes/[id]/download` | `src/app/api/qr-codes/[id]/download/route.ts` | `getRequestIdentity()` | ✅ Terminé | Aucun | 2026-03-09 |

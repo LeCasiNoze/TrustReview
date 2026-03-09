@@ -1,12 +1,20 @@
-import { createSupabaseServer } from '@/lib/supabase-server'
-import { requireUserServer } from '@/lib/auth'
-import { redirect } from 'next/navigation'
 import { NextResponse } from 'next/server'
+import { getRequestIdentity, getSupabaseForIdentity } from '@/lib/request-identity'
+import { redirect } from 'next/navigation'
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUserServer()
-    const supabase = await createSupabaseServer()
+    const identity = await getRequestIdentity()
+    
+    if (!identity.isAuthenticated || !identity.userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
+    if (identity.isTempSession) {
+      return NextResponse.json({ error: 'Action not available for temporary sessions' }, { status: 403 })
+    }
+    
+    const supabase = await getSupabaseForIdentity(identity)
     
     const formData = await request.formData()
     const googleReviewUrl = formData.get('google_review_url') as string
@@ -15,7 +23,7 @@ export async function POST(request: Request) {
     const { data: business, error: fetchError } = await supabase
       .from('businesses')
       .select('id')
-      .eq('owner_user_id', user.id)
+      .eq('owner_user_id', identity.userId)
       .single()
 
     if (fetchError && fetchError.code === 'PGRST116') {
@@ -40,6 +48,7 @@ export async function POST(request: Request) {
         updated_at: new Date().toISOString()
       })
       .eq('id', business.id)
+      .eq('owner_user_id', identity.userId)
 
     if (updateError) {
       throw new Error(`Failed to update Google URL: ${updateError.message}`)
@@ -48,7 +57,7 @@ export async function POST(request: Request) {
     redirect('/app/business')
   } catch (error) {
     if (error instanceof Error && error.message.includes('User not found')) {
-      return new Response('Unauthorized', { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     throw error
   }
