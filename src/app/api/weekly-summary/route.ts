@@ -1,23 +1,26 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServer } from "@/lib/supabase-server";
+import { getRequestIdentity, getSupabaseForIdentity } from "@/lib/request-identity";
 import { sendEmail, generateWeeklySummaryEmail } from "@/lib/email-service";
 
 export async function POST() {
   try {
-    const supabase = await createSupabaseServer();
+    const identity = await getRequestIdentity();
     
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !user) {
+    if (!identity.isAuthenticated || !identity.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    
+    if (identity.isTempSession) {
+      return NextResponse.json({ error: "Action not available for temporary sessions" }, { status: 403 });
+    }
+
+    const supabase = await getSupabaseForIdentity(identity);
 
     // Get the business for this user
     const { data: business, error: businessError } = await supabase
       .from("businesses")
       .select("id, name, slug, notification_email")
-      .eq("owner_user_id", user.id)
+      .eq("owner_user_id", identity.userId)
       .single();
 
     if (businessError || !business) {
