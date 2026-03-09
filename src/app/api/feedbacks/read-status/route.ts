@@ -1,10 +1,20 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServer } from "@/lib/supabase-server";
+import { getRequestIdentity, getSupabaseForIdentity } from "@/lib/request-identity";
 
 export async function POST(request: Request) {
   try {
     console.log('📝 Read status API called');
-    const supabase = await createSupabaseServer();
+    const identity = await getRequestIdentity();
+    
+    if (!identity.isAuthenticated || !identity.userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    
+    if (identity.isTempSession) {
+      return NextResponse.json({ error: "Action not available for temporary sessions" }, { status: 403 });
+    }
+    
+    const supabase = await getSupabaseForIdentity(identity);
     const { feedbackId, isRead } = await request.json();
 
     console.log('📊 Read status data:', {
@@ -18,18 +28,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid request data" }, { status: 400 });
     }
 
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     // Get the business for this user
     const { data: business, error: businessError } = await supabase
       .from("businesses")
       .select("id")
-      .eq("owner_user_id", user.id)
+      .eq("owner_user_id", identity.userId)
       .single();
 
     if (businessError || !business) {
@@ -84,7 +87,7 @@ export async function POST(request: Request) {
     // Create or update read status in feedback_read_status table
     console.log('💾 Upserting read status:', {
       feedback_id: feedbackId,
-      user_id: user.id,
+      user_id: identity.userId,
       is_read: isRead
     });
 
@@ -92,7 +95,7 @@ export async function POST(request: Request) {
       .from("feedback_read_status")
       .upsert({
         feedback_id: feedbackId,
-        user_id: user.id,
+        user_id: identity.userId,
         is_read: isRead,
         updated_at: new Date().toISOString()
       }, {
@@ -115,7 +118,17 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createSupabaseServer();
+    const identity = await getRequestIdentity();
+    
+    if (!identity.isAuthenticated || !identity.userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    
+    if (identity.isTempSession) {
+      return NextResponse.json({ error: "Action not available for temporary sessions" }, { status: 403 });
+    }
+    
+    const supabase = await getSupabaseForIdentity(identity);
     const { searchParams } = new URL(request.url);
     const feedbackIds = searchParams.get('feedbackIds');
 
@@ -125,18 +138,11 @@ export async function GET(request: Request) {
 
     const feedbackIdArray = feedbackIds.split(',');
 
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     // Get read statuses for these feedbacks
     const { data, error } = await supabase
       .from("feedback_read_status")
       .select("feedback_id, is_read")
-      .eq("user_id", user.id)
+      .eq("user_id", identity.userId)
       .in("feedback_id", feedbackIdArray);
 
     if (error) {

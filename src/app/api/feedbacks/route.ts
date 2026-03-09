@@ -1,33 +1,27 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServer } from "@/lib/supabase-server";
-import { authenticateRequest } from "@/lib/auth-middleware";
+import { getRequestIdentity, getSupabaseForIdentity } from "@/lib/request-identity";
 
 export async function GET() {
   try {
-    const auth = await authenticateRequest();
+    const identity = await getRequestIdentity();
     
-    if (!auth.isAuthenticated) {
+    if (!identity.isAuthenticated || !identity.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Si session temporaire, retourner des données factices
-    if (auth.isTempSession) {
+    if (identity.isTempSession) {
       return NextResponse.json([]);
     }
 
     // Authentification Supabase normale
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 401 });
-    }
+    const supabase = await getSupabaseForIdentity(identity);
 
     // Get the business for this user
     const { data: business, error: businessError } = await supabase
       .from("businesses")
       .select("id")
-      .eq("owner_user_id", user.id)
+      .eq("owner_user_id", identity.userId)
       .single();
 
     if (businessError || !business) {

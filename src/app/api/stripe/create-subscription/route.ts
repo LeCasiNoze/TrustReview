@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { createStripeSubscription, STRIPE_PLANS } from "@/lib/stripe";
-import { createSupabaseServer } from "@/lib/supabase-server";
+import { getRequestIdentity, getSupabaseForIdentity } from "@/lib/request-identity";
 import { getUserSubscriptionInfoServer } from "@/lib/subscription.server";
-import { authenticateRequest } from "@/lib/auth-middleware";
 import Stripe from 'stripe';
 
 export async function POST(req: Request) {
@@ -14,27 +13,22 @@ export async function POST(req: Request) {
     }
 
     // Vérifier l'authentification (Supabase ou temporaire)
-    const auth = await authenticateRequest();
+    const identity = await getRequestIdentity();
     
-    if (!auth.isAuthenticated) {
+    if (!identity.isAuthenticated || !identity.userId) {
       return NextResponse.json({ error: "User not authenticated" }, { status: 401 });
     }
 
     // Pour les sessions temporaires, cette API n'est pas utilisée
     // On utilise create-checkout-session à la place
-    if (auth.isTempSession) {
+    if (identity.isTempSession) {
       return NextResponse.json({ error: "Use checkout session for temp users" }, { status: 400 });
     }
 
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      return NextResponse.json({ error: "User not authenticated" }, { status: 401 });
-    }
+    const supabase = await getSupabaseForIdentity(identity);
 
     // Récupérer les infos d'abonnement actuel
-    const subscriptionInfo = await getUserSubscriptionInfoServer();
+    const subscriptionInfo = await getUserSubscriptionInfoServer(identity);
     
     if (!subscriptionInfo || !subscriptionInfo.subscription?.stripe_customer_id) {
       return NextResponse.json({ error: "No Stripe customer found" }, { status: 400 });
@@ -103,7 +97,7 @@ export async function POST(req: Request) {
         cancel_at_period_end: false,
         updated_at: new Date().toISOString()
       })
-      .eq('user_id', user.id);
+      .eq('user_id', identity.userId);
 
     return NextResponse.json({
       subscription: stripeSubscriptionResponse,

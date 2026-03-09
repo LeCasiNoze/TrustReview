@@ -1,17 +1,16 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServer } from "@/lib/supabase-server";
-import { authenticateRequest } from "@/lib/auth-middleware";
+import { getRequestIdentity, getSupabaseForIdentity } from "@/lib/request-identity";
 
 export async function GET() {
   try {
-    const auth = await authenticateRequest();
+    const identity = await getRequestIdentity();
     
-    if (!auth.isAuthenticated) {
+    if (!identity.isAuthenticated || !identity.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Si session temporaire, retourner des données factices
-    if (auth.isTempSession) {
+    if (identity.isTempSession) {
       return NextResponse.json({
         totalRatings: 0,
         totalFeedbacks: 0,
@@ -22,21 +21,15 @@ export async function GET() {
     }
 
     // Authentification Supabase normale
-    const supabase = await createSupabaseServer();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !user) {
-      console.error("User auth error:", userError);
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await getSupabaseForIdentity(identity);
 
-    console.log("User authenticated:", user.id);
+    console.log("User authenticated:", identity.userId);
 
     // Get the business for this user
     const { data: business, error: businessError } = await supabase
       .from("businesses")
       .select("id, name, slug")
-      .eq("owner_user_id", user.id)
+      .eq("owner_user_id", identity.userId)
       .single();
 
     if (businessError) {
@@ -45,7 +38,7 @@ export async function GET() {
     }
 
     if (!business) {
-      console.log("No business found for user:", user.id);
+      console.log("No business found for user:", identity.userId);
       return NextResponse.json({ error: "Business not found" }, { status: 404 });
     }
 

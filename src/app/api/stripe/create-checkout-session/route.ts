@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { stripe, STRIPE_PLANS } from "@/lib/stripe";
-import { createSupabaseServer } from "@/lib/supabase-server";
-import { authenticateRequest } from "@/lib/auth-middleware";
+import { getRequestIdentity, getSupabaseForIdentity } from "@/lib/request-identity";
 
 export async function POST(req: Request) {
   try {
@@ -54,9 +53,9 @@ export async function POST(req: Request) {
     }
 
     // 5. Authentification
-    const auth = await authenticateRequest();
+    const identity = await getRequestIdentity();
     
-    if (!auth.isAuthenticated) {
+    if (!identity.isAuthenticated || !identity.userId) {
       return NextResponse.json({ 
         error: "Non authentifié",
         details: "Utilisateur non authentifié"
@@ -67,11 +66,11 @@ export async function POST(req: Request) {
     let user = null;
     let customerId: string | null = null;
     
-    if (auth.isTempSession) {
+    if (identity.isTempSession) {
       // Session temporaire : créer un client directement
       const customer = await stripe.customers.create({
-        email: auth.email,
-        name: auth.email,
+        email: identity.email,
+        name: identity.email,
         metadata: {
           source: 'trustreview_temp_session',
           temp_session: 'true'
@@ -80,20 +79,15 @@ export async function POST(req: Request) {
       customerId = customer.id;
     } else {
       // Session Supabase normale
-      const supabase = await createSupabaseServer();
-      const { data: { user: supabaseUser } } = await supabase.auth.getUser();
+      const supabase = await getSupabaseForIdentity(identity);
       
-      if (!supabaseUser) {
-        return NextResponse.json({ error: "Utilisateur non authentifié" }, { status: 401 });
-      }
-      
-      user = supabaseUser;
+      user = identity.user;
       
       // Récupérer les infos d'abonnement existant
       const { data: subscription } = await supabase
         .from('subscriptions')
         .select('stripe_customer_id')
-        .eq('user_id', user.id)
+        .eq('user_id', identity.userId)
         .single();
       
       customerId = subscription?.stripe_customer_id || null;
@@ -139,12 +133,12 @@ export async function POST(req: Request) {
         customerId = customer.id;
 
         // Sauvegarder le customer ID en base pour les sessions Supabase
-        if (!auth.isTempSession) {
-          const supabase = await createSupabaseServer();
+        if (!identity.isTempSession) {
+          const supabase = await getSupabaseForIdentity(identity);
           await supabase
             .from('subscriptions')
             .update({ stripe_customer_id: customerId })
-            .eq('user_id', user.id);
+            .eq('user_id', identity.userId);
         }
       } catch (customerError) {
         console.error("❌ Erreur création client Stripe:", customerError);
@@ -185,17 +179,17 @@ export async function POST(req: Request) {
         success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://trustreview-eight.vercel.app'}/app/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://trustreview-eight.vercel.app'}/app/billing?canceled=true`,
         metadata: {
-          user_id: user?.id || auth.email,
+          user_id: user?.id || identity.email,
           plan_id: planId,
           billing_cycle: billingCycle,
-          is_temp_session: auth.isTempSession ? 'true' : 'false'
+          is_temp_session: identity.isTempSession ? 'true' : 'false'
         },
-        subscription_data: auth.isTempSession ? undefined : {
+        subscription_data: identity.isTempSession ? undefined : {
           metadata: {
-            user_id: user?.id || auth.email,
+            user_id: user?.id || identity.email,
             plan_id: planId,
             billing_cycle: billingCycle,
-            is_temp_session: auth.isTempSession ? 'true' : 'false'
+            is_temp_session: identity.isTempSession ? 'true' : 'false'
           },
         },
       });

@@ -1,9 +1,19 @@
 import { NextResponse } from "next/server";
 import { createStripeCustomer } from "@/lib/stripe";
-import { createSupabaseServer } from "@/lib/supabase-server";
+import { getRequestIdentity, getSupabaseForIdentity } from "@/lib/request-identity";
 
 export async function POST(req: Request) {
   try {
+    const identity = await getRequestIdentity();
+    
+    if (!identity.isAuthenticated || !identity.userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    
+    if (identity.isTempSession) {
+      return NextResponse.json({ error: "Action not available for temporary sessions" }, { status: 403 });
+    }
+    
     const { email, name } = await req.json();
     
     if (!email) {
@@ -14,15 +24,12 @@ export async function POST(req: Request) {
     const customer = await createStripeCustomer(email, name);
 
     // Mettre à jour la table subscriptions avec le stripe_customer_id
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
+    const supabase = await getSupabaseForIdentity(identity);
     
-    if (user) {
-      await supabase
-        .from('subscriptions')
-        .update({ stripe_customer_id: customer.id })
-        .eq('user_id', user.id);
-    }
+    await supabase
+      .from('subscriptions')
+      .update({ stripe_customer_id: customer.id })
+      .eq('user_id', identity.userId);
 
     return NextResponse.json({ customer });
   } catch (error) {
