@@ -12,22 +12,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Plan and billing cycle are required" }, { status: 400 });
     }
 
-    // Vérifier l'authentification (Supabase ou temporaire)
     const identity = await getRequestIdentity();
     
     if (!identity.isAuthenticated || !identity.userId) {
-      return NextResponse.json({ error: "User not authenticated" }, { status: 401 });
-    }
-
-    // Pour les sessions temporaires, cette API n'est pas utilisée
-    // On utilise create-checkout-session à la place
-    if (identity.isTempSession) {
-      return NextResponse.json({ error: "Use checkout session for temp users" }, { status: 400 });
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
     const supabase = await getSupabaseForIdentity(identity);
 
-    // Récupérer les infos d'abonnement actuel
     const subscriptionInfo = await getUserSubscriptionInfoServer(identity);
     
     if (!subscriptionInfo || !subscriptionInfo.subscription?.stripe_customer_id) {

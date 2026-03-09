@@ -7,18 +7,15 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params
   try {
+    const { id } = await params
     const identity = await getRequestIdentity()
 
     if (!identity.isAuthenticated || !identity.userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (identity.isTempSession) {
-      return NextResponse.json({ error: 'Action not available for temporary sessions' }, { status: 403 })
-    }
-
+    // Plus de sessions temporaires - uniquement Supabase
     const supabase = await getSupabaseForIdentity(identity)
     
     // Get QR code with business info

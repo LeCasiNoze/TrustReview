@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getRequestIdentity } from "@/lib/request-identity";
 import { getActiveBusiness } from "@/lib/active-business";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const identity = await getRequestIdentity();
     
@@ -10,13 +10,13 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    console.log("Business API - Authenticated:", { email: identity.email, isTemp: identity.isTempSession });
+    console.log("Business API - Authenticated:", { email: identity.email });
 
     // Utiliser la source de vérité unique pour l'entreprise active
     const business = await getActiveBusiness(identity);
 
     if (!business) {
-      console.log("🔍 [BUSINESS-CURRENT] Aucune entreprise active trouvée");
+      console.log(" [BUSINESS-CURRENT] Aucune entreprise active trouvée");
       return NextResponse.json({ error: "No active business found" }, { status: 404 });
     }
 

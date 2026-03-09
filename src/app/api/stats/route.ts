@@ -9,18 +9,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Si session temporaire, retourner des données factices
-    if (identity.isTempSession) {
-      return NextResponse.json({
-        totalRatings: 0,
-        totalFeedbacks: 0,
-        averageRating: 0,
-        positiveRate: 0,
-        monthlyStats: []
-      });
-    }
-
-    // Authentification Supabase normale
+    // Plus de sessions temporaires - uniquement Supabase
     const supabase = await getSupabaseForIdentity(identity);
 
     console.log("User authenticated:", identity.userId);

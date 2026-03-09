@@ -62,36 +62,23 @@ export async function POST(req: Request) {
       }, { status: 401 });
     }
 
-    // Pour les sessions temporaires, créer un client Stripe avec l'email
+    // Pour les sessions Supabase, créer le client Stripe
     let user = null;
     let customerId: string | null = null;
     
-    if (identity.isTempSession) {
-      // Session temporaire : créer un client directement
-      const customer = await stripe.customers.create({
-        email: identity.email,
-        name: identity.email,
-        metadata: {
-          source: 'trustreview_temp_session',
-          temp_session: 'true'
-        }
-      });
-      customerId = customer.id;
-    } else {
-      // Session Supabase normale
-      const supabase = await getSupabaseForIdentity(identity);
-      
-      user = identity.user;
-      
-      // Récupérer les infos d'abonnement existant
-      const { data: subscription } = await supabase
-        .from('subscriptions')
-        .select('stripe_customer_id')
-        .eq('user_id', identity.userId)
-        .single();
-      
-      customerId = subscription?.stripe_customer_id || null;
-    }
+    // Authentification Supabase normale
+    const supabase = await getSupabaseForIdentity(identity);
+    
+    user = identity.user;
+    
+    // Récupérer les infos d'abonnement existant
+    const { data: subscription } = await supabase
+      .from('subscriptions')
+      .select('stripe_customer_id')
+      .eq('user_id', identity.userId)
+      .single();
+    
+    customerId = subscription?.stripe_customer_id || null;
     
     // 6. Résolution du Price ID
     const priceIdKey = `${planId}_${billingCycle}` as keyof typeof STRIPE_PLANS;
@@ -132,14 +119,12 @@ export async function POST(req: Request) {
         });
         customerId = customer.id;
 
-        // Sauvegarder le customer ID en base pour les sessions Supabase
-        if (!identity.isTempSession) {
-          const supabase = await getSupabaseForIdentity(identity);
-          await supabase
-            .from('subscriptions')
-            .update({ stripe_customer_id: customerId })
-            .eq('user_id', identity.userId);
-        }
+        // Sauvegarder le customer ID en base
+        const supabase = await getSupabaseForIdentity(identity);
+        await supabase
+          .from('subscriptions')
+          .update({ stripe_customer_id: customerId })
+          .eq('user_id', identity.userId);
       } catch (customerError) {
         console.error("❌ Erreur création client Stripe:", customerError);
         return NextResponse.json({ 
@@ -182,14 +167,14 @@ export async function POST(req: Request) {
           user_id: user?.id || identity.email,
           plan_id: planId,
           billing_cycle: billingCycle,
-          is_temp_session: identity.isTempSession ? 'true' : 'false'
+          is_temp_session: 'false'
         },
-        subscription_data: identity.isTempSession ? undefined : {
+        subscription_data: {
           metadata: {
             user_id: user?.id || identity.email,
             plan_id: planId,
             billing_cycle: billingCycle,
-            is_temp_session: identity.isTempSession ? 'true' : 'false'
+            is_temp_session: 'false'
           },
         },
       });

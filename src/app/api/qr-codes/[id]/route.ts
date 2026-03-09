@@ -14,10 +14,6 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (identity.isTempSession) {
-      return NextResponse.json({ error: 'Action not available for temporary sessions' }, { status: 403 });
-    }
-
     const supabase = await getSupabaseForIdentity(identity);
     
     // Get the QR code to verify ownership
@@ -81,15 +77,12 @@ export async function DELETE(
   try {
     const { id } = await params;
     const identity = await getRequestIdentity();
-
+    
     if (!identity.isAuthenticated || !identity.userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (identity.isTempSession) {
-      return NextResponse.json({ error: 'Action not available for temporary sessions' }, { status: 403 });
-    }
-
+    // Plus de sessions temporaires - uniquement Supabase
     const supabase = await getSupabaseForIdentity(identity);
     
     // Get the QR code with business to verify ownership

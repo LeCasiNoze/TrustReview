@@ -10,10 +10,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
-    if (identity.isTempSession) {
-      return NextResponse.json({ error: "Action not available for temporary sessions" }, { status: 403 });
-    }
-    
     const supabase = await getSupabaseForIdentity(identity);
     const { feedbackId, isRead } = await request.json();
 
@@ -122,10 +118,6 @@ export async function GET(request: Request) {
     
     if (!identity.isAuthenticated || !identity.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    
-    if (identity.isTempSession) {
-      return NextResponse.json({ error: "Action not available for temporary sessions" }, { status: 403 });
     }
     
     const supabase = await getSupabaseForIdentity(identity);

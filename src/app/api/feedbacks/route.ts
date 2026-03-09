@@ -9,24 +9,27 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Si session temporaire, retourner des données factices
-    if (identity.isTempSession) {
-      return NextResponse.json([]);
-    }
-
-    // Authentification Supabase normale
+    // Plus de sessions temporaires - uniquement Supabase
     const supabase = await getSupabaseForIdentity(identity);
 
     // Get the business for this user
     const { data: business, error: businessError } = await supabase
       .from("businesses")
-      .select("id")
+      .select("id, name, slug")
       .eq("owner_user_id", identity.userId)
       .single();
 
-    if (businessError || !business) {
+    if (businessError) {
+      console.error("Business fetch error:", businessError);
       return NextResponse.json({ error: "Business not found" }, { status: 404 });
     }
+
+    if (!business) {
+      console.log("No business found for user:", identity.userId);
+      return NextResponse.json({ error: "Business not found" }, { status: 404 });
+    }
+
+    console.log("Business found:", business.id);
 
     // Get rating sessions for this business
     const { data: ratings, error: ratingsError } = await supabase

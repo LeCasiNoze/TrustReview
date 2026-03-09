@@ -9,11 +9,8 @@ export async function POST(req: Request) {
     if (!identity.isAuthenticated || !identity.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    
-    if (identity.isTempSession) {
-      return NextResponse.json({ error: "Action not available for temporary sessions" }, { status: 403 });
-    }
-    
+
+    // Plus de sessions temporaires - uniquement Supabase
     const { email, name } = await req.json();
     
     if (!email) {

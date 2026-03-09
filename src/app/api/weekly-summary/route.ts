@@ -10,10 +10,7 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
-    if (identity.isTempSession) {
-      return NextResponse.json({ error: "Action not available for temporary sessions" }, { status: 403 });
-    }
-
+    // Plus de sessions temporaires - uniquement Supabase
     const supabase = await getSupabaseForIdentity(identity);
 
     // Get the business for this user

@@ -27,60 +27,43 @@ export interface BusinessManager {
 }
 
 export async function getUserBusinesses(identity?: RequestIdentity): Promise<BusinessManager> {
-  console.log("🏢 [BUSINESS-MANAGER] getUserBusinesses appelé");
+  console.log(" [BUSINESS-MANAGER] getUserBusinesses appelé");
   
   const auth = identity ?? await getRequestIdentity();
-  console.log("🏢 [BUSINESS-MANAGER] Auth result:", {
+  
+  if (!auth.isAuthenticated || !auth.userId) {
+    throw new Error('User not authenticated');
+  }
+  
+  // Uniquement Supabase - plus de sessions temporaires
+  const supabase = auth.supabase ?? await createSupabaseServer();
+  const userId = auth.userId;
+  
+  console.log(" [BUSINESS-MANAGER] Auth result:", {
     isAuthenticated: auth.isAuthenticated,
-    isTempSession: auth.isTempSession,
     email: auth.email
   });
   
-  if (!auth.isAuthenticated) {
-    console.log("🏢 [BUSINESS-MANAGER] User non authentifié");
-    throw new Error('User not authenticated');
-  }
-
-  // Utiliser le client approprié selon le type d'authentification
-  const supabase = auth.isTempSession
-    ? await createSupabaseServiceClient()
-    : auth.supabase ?? await createSupabaseServer();
-
-  // Récupérer les infos d'abonnement pour vérifier les limites
-  // Utiliser la logique côté serveur directement
-  let userId: string;
+  // Récupérer l'abonnement
   let subscription, subscriptionError;
   
-  if (auth.isTempSession) {
-    // Pour les sessions temporaires, créer un abonnement par défaut et un UUID déterministe
-    console.log("🏢 [BUSINESS-MANAGER] Session temporaire détectée, utilisation abonnement starter par défaut");
-    subscription = {
-      plan: {
-        slug: 'starter'
-      }
-    };
-    subscriptionError = null;
-    // Pour les sessions temporaires, générer un UUID déterministe via helper partagé
-    userId = getTemporaryUserId(auth.email);
-  } else {
-    userId = auth.userId!;
-    console.log("🏢 [BUSINESS-MANAGER] Récupération abonnement pour user:", userId);
-    const result = await supabase
-      .from('subscriptions')
-      .select(`
-        *,
-        plan:subscription_plans(slug)
-      `)
-      .eq('user_id', userId)
-      .single();
-    subscription = result.data;
-    subscriptionError = result.error;
-  }
+  const { data: subscriptionData, error: subError } = await supabase
+    .from('subscriptions')
+    .select(`
+      *,
+      plan:subscription_plans(*)
+    `)
+    .eq('user_id', userId)
+    .single();
+    
+  subscription = subscriptionData;
+  subscriptionError = subError;
 
   if (subscriptionError) {
-    console.error("🏢 [BUSINESS-MANAGER] Erreur récupération abonnement:", subscriptionError);
+    console.error(" [BUSINESS-MANAGER] Erreur récupération abonnement:", subscriptionError);
   }
 
+  console.log(" [BUSINESS-MANAGER] Subscription trouvée:", subscription ? {
   console.log("🏢 [BUSINESS-MANAGER] Subscription trouvée:", subscription ? {
     plan: subscription.plan?.slug
   } : 'null');

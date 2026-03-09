@@ -4,17 +4,13 @@ import { redirect } from 'next/navigation'
 
 export async function POST(request: Request) {
   try {
-    const identity = await getRequestIdentity()
+    const identity = await getRequestIdentity();
     
     if (!identity.isAuthenticated || !identity.userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    
-    if (identity.isTempSession) {
-      return NextResponse.json({ error: 'Action not available for temporary sessions' }, { status: 403 })
-    }
-    
-    const supabase = await getSupabaseForIdentity(identity)
+
+    const supabase = await getSupabaseForIdentity(identity);
     
     const formData = await request.formData()
     const googleReviewUrl = formData.get('google_review_url') as string
