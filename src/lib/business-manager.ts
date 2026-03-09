@@ -1,7 +1,6 @@
-import { createSupabaseServer, createSupabaseServiceClient } from "@/lib/supabase-server";
+import { createSupabaseServer } from "@/lib/supabase-server";
 import type { RequestIdentity } from "@/lib/request-identity";
 import { getRequestIdentity } from "@/lib/request-identity";
-import { getTemporaryUserId } from "@/lib/temp-uuid";
 import { getPlanQuotas, calculateRemainingQuotas } from "@/lib/quotas";
 import { setFirstBusinessAsActive } from "@/lib/active-business";
 
@@ -27,7 +26,7 @@ export interface BusinessManager {
 }
 
 export async function getUserBusinesses(identity?: RequestIdentity): Promise<BusinessManager> {
-  console.log(" [BUSINESS-MANAGER] getUserBusinesses appelé");
+  console.log("🏢 [BUSINESS-MANAGER] getUserBusinesses appelé");
   
   const auth = identity ?? await getRequestIdentity();
   
@@ -39,7 +38,7 @@ export async function getUserBusinesses(identity?: RequestIdentity): Promise<Bus
   const supabase = auth.supabase ?? await createSupabaseServer();
   const userId = auth.userId;
   
-  console.log(" [BUSINESS-MANAGER] Auth result:", {
+  console.log("🏢 [BUSINESS-MANAGER] Auth result:", {
     isAuthenticated: auth.isAuthenticated,
     email: auth.email
   });
@@ -60,10 +59,9 @@ export async function getUserBusinesses(identity?: RequestIdentity): Promise<Bus
   subscriptionError = subError;
 
   if (subscriptionError) {
-    console.error(" [BUSINESS-MANAGER] Erreur récupération abonnement:", subscriptionError);
+    console.error("🏢 [BUSINESS-MANAGER] Erreur récupération abonnement:", subscriptionError);
   }
 
-  console.log(" [BUSINESS-MANAGER] Subscription trouvée:", subscription ? {
   console.log("🏢 [BUSINESS-MANAGER] Subscription trouvée:", subscription ? {
     plan: subscription.plan?.slug
   } : 'null');
@@ -74,8 +72,8 @@ export async function getUserBusinesses(identity?: RequestIdentity): Promise<Bus
 
   // Récupérer toutes les entreprises de l'utilisateur
   console.log("🔍 [BUSINESS-CHECK-DEBUG] QUOTA CHECK:", {
-    sessionType: auth.isTempSession ? "TEMPORARY" : "SUPABASE",
-    clientType: auth.isTempSession ? "createSupabaseServiceClient()" : "createSupabaseServer()",
+    sessionType: "SUPABASE",
+    clientType: "createSupabaseServer()",
     userId: userId,
     email: auth.email,
     requete: `SELECT * FROM businesses WHERE owner_user_id = '${userId}'`
@@ -83,217 +81,151 @@ export async function getUserBusinesses(identity?: RequestIdentity): Promise<Bus
   
   let businesses, error;
   
-  if (auth.isTempSession) {
-    // Pour les sessions temporaires, chercher par email au lieu de UUID
-    const result = await supabase
-      .from('businesses')
-      .select('*')
-      .eq('owner_user_id', userId)
-      .order('created_at', { ascending: false });
-    businesses = result.data;
-    error = result.error;
+  const { data: businessesData, error: businessesError } = await supabase
+    .from('businesses')
+    .select('*')
+    .eq('owner_user_id', userId)
+    .order('created_at', { ascending: false });
     
-    console.log("🔍 [BUSINESS-CHECK-DEBUG] RÉSULTAT QUOTA CHECK:", {
-      nombreEntreprises: businesses?.length || 0,
-      entreprises: businesses?.map(b => ({
-        id: b.id,
-        name: b.name,
-        owner_user_id: b.owner_user_id
-      }))
-    });
-  } else {
-    const result = await supabase
-      .from('businesses')
-      .select('*')
-      .eq('owner_user_id', userId)
-      .order('created_at', { ascending: false });
-    businesses = result.data;
-    error = result.error;
-    
-    console.log("🔍 [BUSINESS-CHECK-DEBUG] RÉSULTAT QUOTA CHECK:", {
-      nombreEntreprises: businesses?.length || 0,
-      entreprises: businesses?.map(b => ({
-        id: b.id,
-        name: b.name,
-        owner_user_id: b.owner_user_id
-      }))
-    });
-  }
+  businesses = businessesData;
+  error = businessesError;
 
   if (error) {
-    console.error('🏢 [BUSINESS-MANAGER] Error fetching businesses:', error);
+    console.error("🏢 [BUSINESS-MANAGER] Erreur récupération entreprises:", error);
     throw error;
   }
 
-  const businessList = businesses || [];
-  console.log("🏢 [BUSINESS-MANAGER] Entreprises trouvées:", businessList.length);
-  
-  const canCreateMore = planQuotas.max_businesses === null || businessList.length < planQuotas.max_businesses;
-  const remainingSlots = planQuotas.max_businesses === null ? null : Math.max(0, planQuotas.max_businesses - businessList.length);
-  
-  console.log("🏢 [BUSINESS-MANAGER] Calcul quotas:", {
-    businessListLength: businessList.length,
-    maxBusinesses: planQuotas.max_businesses,
-    canCreateMore,
-    remainingSlots
-  });
+  console.log("🏢 [BUSINESS-MANAGER] Entreprises trouvées:", businesses?.length || 0);
 
-  // Récupérer l'entreprise active depuis localStorage (côté client)
-  let activeBusiness: Business | null = null;
-  
-  if (typeof window !== 'undefined') {
-    const activeBusinessId = localStorage.getItem('activeBusinessId');
-    if (activeBusinessId) {
-      activeBusiness = businessList.find(b => b.id === activeBusinessId) || businessList[0] || null;
-    } else {
-      activeBusiness = businessList[0] || null;
-      if (activeBusiness) {
-        localStorage.setItem('activeBusinessId', activeBusiness.id);
-      }
-    }
-  } else {
-    // Côté serveur, prendre la première entreprise
-    activeBusiness = businessList[0] || null;
+  // Calculer les quotas restants
+  const remainingQuotas = calculateRemainingQuotas(
+    subscription?.plan?.slug,
+    businesses?.length || 0,
+    0 // QR codes non pertinents ici
+  );
+
+  console.log("🏢 [BUSINESS-MANAGER] Quotas calculés:", remainingQuotas);
+
+  // Définir comme entreprise active si c'est la première (source de vérité unique)
+  if (businesses && businesses.length === 0) {
+    await setFirstBusinessAsActive(userId, false);
   }
 
   return {
-    businesses: businessList,
-    activeBusiness,
-    canCreateMore,
-    remainingSlots
+    businesses: businesses || [],
+    activeBusiness: businesses?.find(b => b.is_active) || null,
+    canCreateMore: remainingQuotas.canCreateBusiness,
+    remainingSlots: remainingQuotas.remainingBusinesses
   };
 }
 
-export async function setActiveBusiness(businessId: string): Promise<void> {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('activeBusinessId', businessId);
-  }
-}
-
-export async function createBusiness(businessData: Partial<Business>, identity?: RequestIdentity): Promise<Business> {
+export async function createBusiness(
+  businessData: Omit<Business, 'id' | 'created_at' | 'updated_at' | 'owner_user_id'>,
+  identity?: RequestIdentity
+): Promise<Business> {
   const auth = identity ?? await getRequestIdentity();
   
+  if (!auth.isAuthenticated || !auth.userId) {
+    throw new Error('User not authenticated');
+  }
+  
+  // Uniquement Supabase - plus de sessions temporaires
+  const supabase = auth.supabase ?? await createSupabaseServer();
+  const userId = auth.userId;
+
+  // Vérifier les quotas
+  const businessesManager = await getUserBusinesses(auth);
+  
+  if (!businessesManager.canCreateMore) {
+    throw new Error(`Limite d'entreprises atteinte (${businessesManager.remainingSlots || 0} restantes)`);
+  }
+
   // LOGS DIAGNOSTIC - Étape 1: Type de session
   console.log("🔍 [DIAG] Session type detected:", {
     isAuthenticated: auth.isAuthenticated,
-    isTempSession: auth.isTempSession,
     email: auth.email,
     hasUser: !!auth.user,
     userId: auth.user?.id
   });
-  
-  if (!auth.isAuthenticated) {
-    throw new Error('User not authenticated');
-  }
 
-  // Vérifier les limites d'abonnement
-  const businessManager = await getUserBusinesses(auth);
-  if (!businessManager.canCreateMore) {
-    throw new Error(`Limite d'entreprises atteinte (${businessManager.businesses.length}/${businessManager.remainingSlots === null ? '∞' : businessManager.businesses.length + businessManager.remainingSlots})`);
-  }
-
-  // LOGS DIAGNOSTIC - Étape 2: Variables d'environnement
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  console.log("🔍 [DIAG] Environment variables:", {
-    hasServiceRoleKey: !!serviceRoleKey,
-    serviceRoleKeyLength: serviceRoleKey?.length || 0,
-    hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-    hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  });
-
-  // LOGS DIAGNOSTIC - Étape 3: Choix du client
+  // LOGS DIAGNOSTIC - Étape 2: Client Supabase
   let clientType: string;
-  let supabase;
+  let supabaseClient;
   
-  if (auth.isTempSession) {
-    console.log("🔍 [DIAG] Temp session detected, attempting service role client...");
-    supabase = await createSupabaseServiceClient();
-    clientType = "createSupabaseServiceClient()";
-  } else {
-    console.log("🔍 [DIAG] Normal Supabase session, using standard client...");
-    supabase = auth.supabase ?? await createSupabaseServer();
-    clientType = "createSupabaseServer()";
-  }
+  supabaseClient = supabase;
+  clientType = "createSupabaseServer()";
   
-  console.log("🔍 [DIAG] Client selected:", clientType);
+  // LOGS DIAGNOSTIC - Étape 3: ID utilisateur
+  console.log("🔍 [DIAG] User ID resolution:", {
+    resolvedUserId: userId,
+    source: "auth.userId"
+  });
   
-  // Déterminer l'ID utilisateur selon le type d'authentification
-  let userId: string;
-  userId = auth.isTempSession ? getTemporaryUserId(auth.email) : auth.userId!;
-
   // LOGS DIAGNOSTIC - Étape 4: Juste avant l'insert
   console.log("🔍 [DIAG] PRE-INSERT ANALYSIS:", {
-    sessionType: auth.isTempSession ? "TEMPORARY" : "SUPABASE",
+    sessionType: "SUPABASE",
     clientUsed: clientType,
     owner_user_id: userId,
-    serviceRoleKeyPresent: !!serviceRoleKey,
-    willUseServiceRole: auth.isTempSession && !!serviceRoleKey
+    serviceRoleKeyPresent: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+    willUseServiceRole: false
   });
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from('businesses')
     .insert({
       ...businessData,
       owner_user_id: userId,
-      is_active: businessData.is_active ?? true,
-      threshold_positive: businessData.threshold_positive ?? 4,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     })
     .select()
     .single();
 
-  // LOGS DIAGNOSTIC - Étape 5: Résultat de l'insert
-  console.log("🔍 [INSERT-DEBUG] LIGNE CRÉÉE:", {
-    success: !error,
-    error: error ? {
-      message: error.message,
-      code: error.code,
-      details: error.details,
-      hint: error.hint
-    } : null,
-    ligneInsérée: data ? {
-      id: data.id,
-      name: data.name,
-      slug: data.slug,
-      owner_user_id: data.owner_user_id,
-      is_active: data.is_active,
-      created_at: data.created_at,
-      updated_at: data.updated_at
-    } : null,
-    sessionType: auth.isTempSession ? "TEMPORARY" : "SUPABASE",
+  if (error) {
+    console.error("🔍 [DIAG] INSERT ERROR:", {
+      error,
+      errorMessage: error.message,
+      errorDetails: error.details,
+      errorHint: error.hint,
+      errorCode: error.code
+    });
+    throw error;
+  }
+
+  console.log("🔍 [DIAG] INSERT SUCCESS:", {
+    businessId: data.id,
+    businessName: data.name,
+    owner_user_id: data.owner_user_id,
+    sessionType: "SUPABASE",
     clientUsed: clientType,
     owner_user_id_utilisé: userId
   });
 
-  if (error) {
-    console.error('🔍 [DIAG] INSERT FAILED:', error);
-    throw error;
-  }
-
   // Définir comme entreprise active si c'est la première (source de vérité unique)
-  if (businessManager.businesses.length === 0) {
-    await setFirstBusinessAsActive(userId, auth.isTempSession);
+  if (businessesManager.businesses.length === 0) {
+    await setFirstBusinessAsActive(userId, false);
   }
 
   return data;
 }
 
-export async function updateBusiness(businessId: string, updates: Partial<Business>, identity?: RequestIdentity): Promise<Business> {
+export async function updateBusiness(
+  businessId: string,
+  businessData: Partial<Omit<Business, 'id' | 'created_at' | 'updated_at' | 'owner_user_id'>>,
+  identity?: RequestIdentity
+): Promise<Business> {
   const auth = identity ?? await getRequestIdentity();
   
   if (!auth.isAuthenticated || !auth.userId) {
     throw new Error('User not authenticated');
   }
   
-  const supabase = auth.isTempSession
-    ? await createSupabaseServiceClient()
-    : auth.supabase ?? await createSupabaseServer();
+  const supabase = auth.supabase ?? await createSupabaseServer();
 
   const { data, error } = await supabase
     .from('businesses')
     .update({
-      ...updates,
+      ...businessData,
       updated_at: new Date().toISOString()
     })
     .eq('id', businessId)
@@ -302,35 +234,23 @@ export async function updateBusiness(businessId: string, updates: Partial<Busine
     .single();
 
   if (error) {
-    console.error('Error updating business:', error);
     throw error;
   }
 
   return data;
 }
 
-export async function deleteBusiness(businessId: string, identity?: RequestIdentity): Promise<void> {
+export async function deleteBusiness(
+  businessId: string,
+  identity?: RequestIdentity
+): Promise<void> {
   const auth = identity ?? await getRequestIdentity();
   
   if (!auth.isAuthenticated || !auth.userId) {
     throw new Error('User not authenticated');
   }
   
-  const supabase = auth.isTempSession
-    ? await createSupabaseServiceClient()
-    : auth.supabase ?? await createSupabaseServer();
-
-  // Vérifier que c'est bien l'entreprise de l'utilisateur
-  const { data: business } = await supabase
-    .from('businesses')
-    .select('id')
-    .eq('id', businessId)
-    .eq('owner_user_id', auth.userId)
-    .single();
-
-  if (!business) {
-    throw new Error('Business not found or access denied');
-  }
+  const supabase = auth.supabase ?? await createSupabaseServer();
 
   const { error } = await supabase
     .from('businesses')
@@ -339,20 +259,6 @@ export async function deleteBusiness(businessId: string, identity?: RequestIdent
     .eq('owner_user_id', auth.userId);
 
   if (error) {
-    console.error('Error deleting business:', error);
     throw error;
-  }
-
-  // Si c'était l'entreprise active, définir la première entreprise restante comme active
-  if (typeof window !== 'undefined') {
-    const activeBusinessId = localStorage.getItem('activeBusinessId');
-    if (activeBusinessId === businessId) {
-      const remainingBusinesses = await getUserBusinesses();
-      if (remainingBusinesses.businesses.length > 0) {
-        localStorage.setItem('activeBusinessId', remainingBusinesses.businesses[0].id);
-      } else {
-        localStorage.removeItem('activeBusinessId');
-      }
-    }
   }
 }
