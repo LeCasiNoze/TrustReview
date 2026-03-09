@@ -63,7 +63,9 @@ export default function LoginPage() {
       baseUrl = window.location.origin;
     }
     
-    const redirectUrl = `${baseUrl}/auth/callback`;
+    const redirectUrl = baseUrl.endsWith('/') 
+      ? `${baseUrl}auth/callback`
+      : `${baseUrl}/auth/callback`;
     
     // Debug en production
     if (process.env.NODE_ENV === "production") {
