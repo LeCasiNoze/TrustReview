@@ -86,11 +86,21 @@ export async function POST(request: NextRequest) {
   try {
     const identity = await getRequestIdentity();
     
+    console.log("🔍 [QR-CODES-POST-DEBUG] Identity resolved:", {
+      isAuthenticated: identity.isAuthenticated,
+      userId: identity.userId,
+      email: identity.email,
+      isTempSession: identity.isTempSession,
+      source: identity.source
+    });
+    
     if (!identity.isAuthenticated || !identity.userId) {
+      console.log("🔍 [QR-CODES-POST-DEBUG] REJECT: Unauthorized - no identity");
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     if (identity.isTempSession) {
+      console.log("🔍 [QR-CODES-POST-DEBUG] REJECT: 403 - temp session not allowed");
       return NextResponse.json({ error: 'Action not available for temporary sessions' }, { status: 403 });
     }
 
@@ -101,12 +111,19 @@ export async function POST(request: NextRequest) {
     // Utiliser la source de vérité unique : entreprise active
     const activeBusiness = await getActiveBusiness(identity);
     
+    console.log("🔍 [QR-CODES-POST-DEBUG] Active business check:", {
+      hasActiveBusiness: !!activeBusiness,
+      businessId: activeBusiness?.id,
+      businessName: activeBusiness?.name,
+      ownerUserId: activeBusiness?.owner_user_id
+    });
+    
     if (!activeBusiness) {
-      console.log("🔍 [QR-CODES-POST] Aucune entreprise active trouvée");
+      console.log("🔍 [QR-CODES-POST-DEBUG] REJECT: 400 - No active business found");
       return NextResponse.json({ error: 'No active business found' }, { status: 400 });
     }
     
-    console.log("🔍 [QR-CODES-POST] Utilisation entreprise active:", {
+    console.log("🔍 [QR-CODES-POST-DEBUG] Using active business:", {
       businessId: activeBusiness.id,
       businessName: activeBusiness.name
     });
@@ -131,21 +148,25 @@ export async function POST(request: NextRequest) {
     const planQuotas = getPlanQuotas(subscription?.plan?.slug);
     const currentQRCodes = existingQRCodes?.length || 0;
     
-    console.log("🔍 [QR-CODES-QUOTA-DEBUG] Quotas check:", {
+    console.log("🔍 [QR-CODES-POST-DEBUG] Quotas check:", {
       planSlug: subscription?.plan?.slug,
       maxQRCodes: planQuotas.max_qr_codes,
       currentQRCodes: currentQRCodes,
-      canCreate: planQuotas.max_qr_codes === null || currentQRCodes < planQuotas.max_qr_codes
+      canCreate: planQuotas.max_qr_codes === null || currentQRCodes < planQuotas.max_qr_codes,
+      subscriptionData: subscription
     });
     
     // Check limit using unified logic
     if (planQuotas.max_qr_codes !== null && currentQRCodes >= planQuotas.max_qr_codes) {
       const message = getQuotaLimitMessage('create_qr', subscription?.plan?.slug, 0);
+      console.log("🔍 [QR-CODES-POST-DEBUG] REJECT: 400 - QR limit reached:", message);
       return NextResponse.json({ 
         error: 'QR code limit reached', 
         details: message
       }, { status: 400 });
     }
+    
+    console.log("🔍 [QR-CODES-POST-DEBUG] ACCEPT: Creating QR code");
     
     const qrCodeData = {
       business_id: activeBusiness.id,
@@ -169,11 +190,14 @@ export async function POST(request: NextRequest) {
       .single()
     
     if (error) {
+      console.log("🔍 [QR-CODES-POST-DEBUG] ERROR: Database error:", error);
       throw error
     }
     
+    console.log("🔍 [QR-CODES-POST-DEBUG] SUCCESS: QR code created:", qrCode.id);
     return NextResponse.json({ qrCode })
   } catch (error) {
+    console.log("🔍 [QR-CODES-POST-DEBUG] CATCH ERROR:", error);
     if (error instanceof Error && error.message.includes('User not found')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
