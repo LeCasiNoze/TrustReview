@@ -5,9 +5,8 @@ export interface AuthContext {
   user: any;
   email: string;
   userId: string | null;
-  isTempSession: boolean;
   isAuthenticated: boolean;
-  source: "supabase" | "temp" | "none";
+  source: "supabase" | "none";
   supabase?: SupabaseClient<any, any, any> | null;
 }
 

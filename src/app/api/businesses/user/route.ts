@@ -11,9 +11,8 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = identity.isTempSession
-      ? await createSupabaseServiceClient()
-      : identity.supabase ?? await createSupabaseServer();
+    // Plus de sessions temporaires - uniquement Supabase
+    const supabase = identity.supabase ?? await createSupabaseServer();
 
     // Get businesses
     const { data: businesses } = await supabase
@@ -23,7 +22,7 @@ export async function GET() {
       .order('created_at', { ascending: false });
 
     // Nettoyer les entreprises actives multiples (sécurité)
-    await cleanupMultipleActiveBusinesses(identity.userId, identity.isTempSession);
+    await cleanupMultipleActiveBusinesses(identity.userId, false);
 
     // Récupérer l'entreprise active avec la source de vérité unique
     const activeBusinessData = await getActiveBusiness(identity);

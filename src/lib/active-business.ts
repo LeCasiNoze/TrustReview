@@ -97,7 +97,7 @@ export async function setActiveBusiness(businessId: string, identity?: RequestId
 /**
  * Définit la première entreprise comme active (pour la création)
  */
-export async function setFirstBusinessAsActive(userId: string, isTempSession: boolean = false): Promise<void> {
+export async function setFirstBusinessAsActive(userId: string, _isTempSession: boolean = false): Promise<void> {
   // Plus de sessions temporaires - isTempSession ignoré
   const supabase = await createSupabaseServer();
 
@@ -141,7 +141,7 @@ export async function setFirstBusinessAsActive(userId: string, isTempSession: bo
 /**
  * Migration : Nettoie les entreprises actives multiples
  */
-export async function cleanupMultipleActiveBusinesses(userId: string, isTempSession: boolean = false): Promise<void> {
+export async function cleanupMultipleActiveBusinesses(userId: string, _isTempSession: boolean = false): Promise<void> {
   // Plus de sessions temporaires - isTempSession ignoré
   const supabase = await createSupabaseServer();
 
